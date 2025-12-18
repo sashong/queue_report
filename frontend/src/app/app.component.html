@@ -1,0 +1,79 @@
+<div class="container">
+
+  <h1>Queue Status Dashboard</h1>
+
+  <!-- Error -->
+  <div class="error" *ngIf="error">{{ error }}</div>
+
+  <!-- Queue Selection -->
+  <div class="card">
+    <label>Select Queue</label>
+
+    <select [(ngModel)]="selectedQueueId" [disabled]="loading">
+      <option value="">-- Select --</option>
+      <option *ngFor="let q of queues" [value]="q.id">
+        {{ q.queuename }}
+      </option>
+    </select>
+
+    <button
+      (click)="loadReport()"
+      [disabled]="loading || !selectedQueueId">
+      Load Report
+    </button>
+  </div>
+
+  <!-- Loading -->
+  <div class="loading" *ngIf="loading">
+    <div class="spinner"></div>
+    <p>Loading data, please wait...</p>
+  </div>
+
+  <!-- Report Table -->
+  <table *ngIf="report && report.length > 0">
+
+    <thead>
+      <tr>
+        <th>Token ID</th>
+        <th>Product Status</th>
+        <th>Integration Mode</th>
+        <th>Current Stage</th>
+        <th>Validation</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let r of report">
+        <td>{{ r.tokenId }}</td>
+        <td>{{ r.productStatus }}</td>
+        <td>{{ r.integrationMode }}</td>
+        <td>{{ r.tokenStage }}</td>
+        <td>
+          <span class="ok" *ngIf="r.validationPassed">✔ Valid</span>
+          <span class="fail" *ngIf="!r.validationPassed">✖ Invalid</span>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- Validation Failures -->
+  <div class="card danger"
+     *ngIf="validationFailures && validationFailures.length > 0">
+
+    <h3>Validation Failures</h3>
+    <ul>
+      <li *ngFor="let v of validationFailures">
+        Token {{ v.tokenId }} — {{ v.validationFailureReason }}
+      </li>
+    </ul>
+  </div>
+
+  <!-- Summary -->
+  <div class="card summary" *ngIf="summary">
+
+    <h3>Summary</h3>
+    <p>Total Records: {{ summary.recordsReported }}</p>
+    <p>Validation Failures: {{ summary.validationFailures }}</p>
+  </div>
+
+
+</div>
