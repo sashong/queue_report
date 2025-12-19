@@ -13,18 +13,29 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
-
+/* ================== GET QUEUES ================== */
 app.get('/queues', async (req, res) => {
   try {
     const snap = await db.collection('queue generation').get();
 
-    const queues = snap.docs.map(doc => {
-      const d = doc.data();
-      return {
-        id: doc.id,
-        queuename: d.queuename ?? d.name ?? null
-      };
-    });
+    if (snap.empty) {
+      return res.json([]);
+    }
+
+    const queues = snap.docs
+      .map(doc => {
+        const d = doc.data();
+        return {
+          id: doc.id,
+          queuename: d.queuename ?? d.name ?? null,
+          queueenddate: d.queueenddate ?? null
+        };
+      })
+      .sort((a, b) => {
+        if (!a.queueenddate) return 1;
+        if (!b.queueenddate) return -1;
+        return b.queueenddate.toMillis() - a.queueenddate.toMillis();
+      });
 
     res.json(queues);
   } catch (err) {
@@ -33,8 +44,7 @@ app.get('/queues', async (req, res) => {
   }
 });
 
-// GET REPORT FOR SELECTED QUEUE
-
+/* ================== QUEUE REPORT ================== */
 app.get('/queue-report/:queueId', async (req, res) => {
   try {
     const { queueId } = req.params;
@@ -54,35 +64,24 @@ app.get('/queue-report/:queueId', async (req, res) => {
       .where('queueref', '==', queueRef)
       .get();
 
-    if (tokenSnap.empty) {
-      return res.json({
-        records: [],
-        validationFailures: [],
-        summary: {
-          recordsReported: 0,
-          validationFailures: 0
-        }
-      });
-    }
+    const records = [];
+    const validationFailures = [];
 
-    const reportRecords = [];
-    const validationFailedRecords = [];
-
-    // -------------------- Process Tokens --------------------
     for (const tokenDoc of tokenSnap.docs) {
+      const tokenId = tokenDoc.id;
       const token = tokenDoc.data();
-      const tokenStage = token.currentstage ?? null;
 
+      const tokenStage = token.currentstage ?? null;
+      const participantName = token.profile_name ?? null;
+      const productName = token.productname ?? null;
       const productRef = token.productref;
+
       if (!productRef) continue;
 
-      // product bridge
-      const productSnap = await productRef.get();
-      if (!productSnap.exists) continue;
-
-      // participantsproduct 
       const ppSnap = await db
         .collection('participantsproduct')
+        .where('eventref', '==', queueRef)
+        .where('profileid', '==', token.profile_id)
         .where('productref', '==', productRef)
         .limit(1)
         .get();
@@ -92,62 +91,62 @@ app.get('/queue-report/:queueId', async (req, res) => {
       const ppDoc = ppSnap.docs[0];
       const pp = ppDoc.data();
 
-      const status = pp.status ?? null;
-      const integrationMode = pp.integrationMode ?? pp.mode ?? null;
+      const productStatus = pp.status ?? null;
+      const integrationMode = pp.integrationMode ?? pp.mode ?? NaN;
 
-      // RULE 2 — VALIDATION (FIRST)
-     
+      // ---------- RULE 2 : VALIDATION ----------
       let validationPassed = true;
-      let validationFailureReason = null;
+      let validationReason = null;
 
       if (
         typeof tokenStage === 'string' &&
         tokenStage.toLowerCase() === 'completed' &&
-        status !== 'completed'
+        productStatus !== 'completed'
       ) {
         validationPassed = false;
-        validationFailureReason =
-          'Token stage is completed but participant product status is not completed';
+        validationReason =
+          'Current stage is completed but participant product status is not completed';
 
-        validationFailedRecords.push({
+        validationFailures.push({
           queuename,
-          tokenId: tokenDoc.id,
-          productId: productSnap.id,
-          participantProductId: ppDoc.id,
-          productStatus: status,
+          tokenId,
+          participantName,
+          productName,
+          productStatus,
           integrationMode,
           tokenStage,
-          validationFailureReason
+          validationReason
         });
       }
 
-      let includeInReport;
+      // ---------- RULE 1 ----------
+      const rule1Passed =
+        productStatus === 'completed'
+          ? integrationMode === 'completed'
+          : productStatus === 'ongoing';
 
-      if (status === 'completed') {
-        includeInReport = integrationMode === 'completed';
-      } else {
-        includeInReport = status === 'ongoing';
-      }
-
-      if (!includeInReport) continue;
-      reportRecords.push({
+      // ---------- FINAL RECORD ----------
+      records.push({
         queuename,
-        tokenId: tokenDoc.id,
-        productId: productSnap.id,
-        participantProductId: ppDoc.id,
-        productStatus: status,
+        tokenId,
+        participantName,
+        productName,
+        productStatus,
         integrationMode,
         tokenStage,
-        validationPassed
+        validationPassed,
+        validationReason,
+        rule1Passed
       });
     }
 
+    // ---------- RESPONSE ----------
     res.json({
-      records: reportRecords,
-      validationFailures: validationFailedRecords,
+      records,
+      validationFailures,
       summary: {
-        recordsReported: reportRecords.length,
-        validationFailures: validationFailedRecords.length
+        recordsReported: records.length,
+        validationFailures: validationFailures.length
       }
     });
   } catch (err) {

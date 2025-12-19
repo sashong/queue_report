@@ -31,19 +31,21 @@
 
   <!-- Report Table -->
   <table *ngIf="report && report.length > 0">
-
     <thead>
       <tr>
-        <th>Token ID</th>
+        <th>Product Name</th>
+        <th>Participant Name</th>
         <th>Product Status</th>
         <th>Integration Mode</th>
         <th>Current Stage</th>
         <th>Validation</th>
       </tr>
     </thead>
+
     <tbody>
       <tr *ngFor="let r of report">
-        <td>{{ r.tokenId }}</td>
+        <td>{{ r?.participantName || '-' }}</td>
+        <td>{{ r?.productName || '-' }}</td>
         <td>{{ r.productStatus }}</td>
         <td>{{ r.integrationMode }}</td>
         <td>{{ r.tokenStage }}</td>
@@ -57,23 +59,33 @@
 
   <!-- Validation Failures -->
   <div class="card danger"
-     *ngIf="validationFailures && validationFailures.length > 0">
+       *ngIf="validationFailures && validationFailures.length > 0">
 
     <h3>Validation Failures</h3>
+
     <ul>
       <li *ngFor="let v of validationFailures">
-        Token {{ v.tokenId }} — {{ v.validationFailureReason }}
+        <strong>{{ v.participantName }}</strong><br />
+
+        Product: {{ v.productName || v.productId }}<br />
+
+        <span style="color:#b00020">
+          {{ v.validationReason }}
+        </span><br />
+
+        <small>
+          Current Stage: {{ v.tokenStage }} |
+          Product Status: {{ v.productStatus }}
+        </small>
       </li>
     </ul>
   </div>
 
   <!-- Summary -->
   <div class="card summary" *ngIf="summary">
-
     <h3>Summary</h3>
     <p>Total Records: {{ summary.recordsReported }}</p>
     <p>Validation Failures: {{ summary.validationFailures }}</p>
   </div>
-
 
 </div>
