@@ -16,9 +16,7 @@
       </option>
     </select>
 
-    <button
-      (click)="loadReport()"
-      [disabled]="loading || !selectedQueueId">
+    <button (click)="loadReport()" [disabled]="loading || !selectedQueueId">
       Load Report
     </button>
   </div>
@@ -29,59 +27,124 @@
     <p>Loading data, please wait...</p>
   </div>
 
-  <!-- Report Table -->
-  <table *ngIf="report && report.length > 0">
-    <thead>
-      <tr>
-        <th>Product Name</th>
-        <th>Participant Name</th>
-        <th>Product Status</th>
-        <th>Integration Mode</th>
-        <th>Current Stage</th>
-        <th>Validation</th>
-      </tr>
-    </thead>
+  <div class="search-bar" *ngIf="allRecords.length > 0">
+  <input
+    type="text"
+    placeholder="Search by Product or Participant..."
+    [(ngModel)]="searchText"
+    (input)="applyFilters()"
+  />
+</div>
 
-    <tbody>
-      <tr *ngFor="let r of report">
-        <td>{{ r?.participantName || '-' }}</td>
-        <td>{{ r?.productName || '-' }}</td>
-        <td>{{ r.productStatus }}</td>
-        <td>{{ r.integrationMode }}</td>
-        <td>{{ r.tokenStage }}</td>
-        <td>
-          <span class="ok" *ngIf="r.validationPassed">✔ Valid</span>
-          <span class="fail" *ngIf="!r.validationPassed">✖ Invalid</span>
-        </td>
-      </tr>
-    </tbody>
-  </table>
 
-  <!-- Validation Failures -->
-  <div class="card danger"
-       *ngIf="validationFailures && validationFailures.length > 0">
+  <!-- REPORT TABLE -->
+  <table *ngIf="filteredRecords.length > 0">
+
+  <thead>
+  <tr>
+    
+    <th>Participant Name</th>
+    <th>Product Name</th>
+    
+
+    <!-- PRODUCT STATUS -->
+    <th class="filter-header">
+      <div class="filter-container">
+        <span>Product Status</span>
+        <span class="filter-icon" (click)="toggleFilter('status')">▼</span>
+
+        <div class="filter-popup" *ngIf="activeFilter === 'status'">
+          <select
+            [(ngModel)]="selectedProductStatus"
+            (change)="applyFilters(); closeFilter()">
+            <option value="">All</option>
+            <option *ngFor="let o of productStatusOptions" [value]="o.value">
+              {{ o.value }} ({{ o.count }})
+            </option>
+          </select>
+        </div>
+      </div>
+    </th>
+
+    <!-- INTEGRATION MODE -->
+    <th class="filter-header">
+      <div class="filter-container">
+        <span>Integration Mode</span>
+        <span class="filter-icon" (click)="toggleFilter('mode')">▼</span>
+
+        <div class="filter-popup" *ngIf="activeFilter === 'mode'">
+          <select
+            [(ngModel)]="selectedIntegrationMode"
+            (change)="applyFilters(); closeFilter()">
+            <option value="">All</option>
+            <option *ngFor="let o of integrationModeOptions" [value]="o.value">
+              {{ o.value }} ({{ o.count }})
+            </option>
+          </select>
+        </div>
+      </div>
+    </th>
+
+    <!-- CURRENT STAGE -->
+    <th class="filter-header">
+      <div class="filter-container">
+        <span>Current Stage</span>
+        <span class="filter-icon" (click)="toggleFilter('stage')">▼</span>
+
+        <div class="filter-popup" *ngIf="activeFilter === 'stage'">
+          <select
+            [(ngModel)]="selectedStage"
+            (change)="applyFilters(); closeFilter()">
+            <option value="">All</option>
+            <option *ngFor="let o of stageOptions" [value]="o.value">
+              {{ o.value }} ({{ o.count }})
+            </option>
+          </select>
+        </div>
+      </div>
+    </th>
+
+    <th>Validation</th>
+  </tr>
+</thead>
+
+
+  <tbody>
+    <tr *ngFor="let r of filteredRecords">
+      <td>{{ r.participantName }}</td>
+      <td>{{ r.productName || '-' }}</td>
+      <td>{{ r.productStatus }}</td>
+      <td>{{ r.integrationMode || 'N/A' }}</td>
+      <td>{{ r.tokenStage }}</td>
+      <td>
+        <span class="ok" *ngIf="r.validationPassed">✔ Valid</span>
+        <span class="fail" *ngIf="!r.validationPassed">✖ Invalid</span>
+      </td>
+    </tr>
+  </tbody>
+
+</table>
+
+  <!-- VALIDATION FAILURES -->
+  <div class="card danger" *ngIf="validationFailures.length > 0">
 
     <h3>Validation Failures</h3>
 
     <ul>
       <li *ngFor="let v of validationFailures">
         <strong>{{ v.participantName }}</strong><br />
-
-        Product: {{ v.productName || v.productId }}<br />
-
-        <span style="color:#b00020">
-          {{ v.validationReason }}
-        </span><br />
-
+        Product: {{ v.productName }}<br />
+        <span style="color:#b00020">{{ v.validationReason }}</span><br />
         <small>
           Current Stage: {{ v.tokenStage }} |
           Product Status: {{ v.productStatus }}
         </small>
       </li>
     </ul>
+
   </div>
 
-  <!-- Summary -->
+  <!-- SUMMARY -->
   <div class="card summary" *ngIf="summary">
     <h3>Summary</h3>
     <p>Total Records: {{ summary.recordsReported }}</p>

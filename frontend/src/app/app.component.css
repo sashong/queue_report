@@ -96,3 +96,29 @@ th {
   color: red;
   margin-bottom: 10px;
 }
+
+.filter-header {
+  position: relative;
+}
+
+.filter-container {
+  display: inline-flex;        /* 🔑 important */
+  align-items: center;
+  gap: 6px;
+  position: relative;          /* anchor point */
+}
+
+.filter-popup {
+  position: absolute;
+  top: 100%;
+  left: 0;                     /* 🔑 align under header text */
+  background: #fff;
+  border: 1px solid #ccc;
+  padding: 4px;
+  z-index: 1000;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+.filter-popup select {
+  width: 180px;
+}
