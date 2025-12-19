@@ -11,6 +11,9 @@ import { ApiService } from './services/api.service';
   styleUrls: ['./app.component.css']
 })
 export class AppComponent implements OnInit {
+  title(title: any) {
+    throw new Error('Method not implemented.');
+  }
 
   queues: any[] = [];
   selectedQueueId: string | null = null;
@@ -55,7 +58,7 @@ export class AppComponent implements OnInit {
       next: (res: any) => {
   console.log('API RESPONSE:', res);
 
-  // 🔥 MAP BACKEND RESPONSE CORRECTLY
+  // MAP BACKEND RESPONSE CORRECTLY
   this.report = Array.isArray(res.report) ? res.report : [];
 
   this.validationFailures = Array.isArray(res.validationFailedRecords)
