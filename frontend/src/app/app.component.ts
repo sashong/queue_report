@@ -46,32 +46,24 @@ export class AppComponent implements OnInit {
   }
 
   loadReport() {
-    if (!this.selectedQueueId) return;
+  if (!this.selectedQueueId) return;
 
-    this.loading = true;
-    this.report = [];
-    this.validationFailures = [];
-    this.summary = null;
-    this.error = null;
+  this.loading = true;
 
-    this.api.getQueueReport(this.selectedQueueId).subscribe({
-      next: (res: any) => {
-  console.log('API RESPONSE:', res);
+  this.api.getQueueReport(this.selectedQueueId).subscribe({
+    next: (res) => {
+      console.log('API RESPONSE:', res);
 
-  // MAP BACKEND RESPONSE CORRECTLY
-  this.report = Array.isArray(res.report) ? res.report : [];
+      this.report = res.records ?? [];
+      this.validationFailures = res.validationFailures ?? [];
+      this.summary = res.summary ?? null;
 
-  this.validationFailures = Array.isArray(res.validationFailedRecords)
-    ? res.validationFailedRecords
-    : [];
-
-  this.summary = {
-    recordsReported: res.recordsReported ?? 0,
-    validationFailures: res.validationFailures ?? 0
-  };
-
-  this.loading = false;
+      this.loading = false;
+    },
+    error: (err) => {
+      console.error(err);
+      this.loading = false;
+    }
+  });
 }
-    });
-  }
 }

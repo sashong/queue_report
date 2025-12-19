@@ -1,20 +1,20 @@
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
+import { Observable } from 'rxjs';
 
-@Injectable({
-  providedIn: 'root'
-})
+@Injectable({ providedIn: 'root' })
 export class ApiService {
-
-  private BASE_URL = 'http://localhost:3000';
+  private baseUrl = 'http://localhost:3000';
 
   constructor(private http: HttpClient) {}
 
-  getQueues() {
-    return this.http.get(`${this.BASE_URL}/queues`);
+  // ✅ Get all queues
+  getQueues(): Observable<any[]> {
+    return this.http.get<any[]>(`${this.baseUrl}/queues`);
   }
 
-  getQueueReport(queueId: string) {
-    return this.http.get(`${this.BASE_URL}/report/${queueId}`);
+  // ✅ Get report for selected queue
+  getQueueReport(queueId: string): Observable<any> {
+    return this.http.get<any>(`${this.baseUrl}/queue-report/${queueId}`);
   }
 }
