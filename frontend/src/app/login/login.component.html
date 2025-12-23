@@ -1,0 +1,50 @@
+<div class="login-page">
+  <div class="login-card">
+
+    <!-- BRAND -->
+    <div class="brand">
+      <h1>ANTANO <span>&</span> HARINI</h1>
+      <p>LEGACY ACCELERATORS</p>
+    </div>
+
+    <!-- EMAIL -->
+    <div class="form-group">
+      <input
+        type="email"
+        placeholder="Email *"
+        [(ngModel)]="email" />
+    </div>
+
+    <!-- PASSWORD -->
+    <div class="form-group password-group">
+      <input
+        type="password"
+        placeholder="Password *"
+        [(ngModel)]="password" />
+      <span class="eye">👁</span>
+    </div>
+
+    <!-- FORGOT -->
+    <div class="forgot">
+      <a href="#">Forgot Password?</a>
+    </div>
+
+    <!-- LOGIN BUTTON -->
+    <button
+      class="login-btn"
+      (click)="login()"
+      [disabled]="loading">
+      {{ loading ? 'Logging in...' : 'Login' }}
+    </button>
+
+    <!-- ERROR -->
+    <p class="error" *ngIf="error">{{ error }}</p>
+
+    <!-- REGISTER -->
+    <div class="register">
+      <span>No Account?</span>
+      <a href="#">Register</a>
+    </div>
+
+  </div>
+</div>

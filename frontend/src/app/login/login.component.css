@@ -1,0 +1,143 @@
+/* ================= HOST FIX ================= */
+:host {
+  display: block;
+}
+
+/* ================= PAGE ================= */
+.login-page {
+  position: fixed;             
+  inset: 0;                   
+  width: 100vw;
+  height: 100vh;
+  background: #f5f4f2;
+
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;                
+}
+
+/* ================= CARD ================= */
+.login-card {
+  width: 420px;
+  background: #ffffff;
+  border-radius: 28px;
+  padding: 42px 38px;
+  box-shadow: 0 25px 60px rgba(0, 0, 0, 0.18);
+  text-align: center;
+}
+
+/* ================= BRAND ================= */
+.brand h1 {
+  font-family: "Times New Roman", serif;
+  font-size: 28px;
+  letter-spacing: 1px;
+  margin: 0;
+}
+
+.brand h1 span {
+  font-size: 22px;
+}
+
+.brand p {
+  margin: 6px 0 32px;
+  font-size: 12px;
+  letter-spacing: 3px;
+  color: #6b7280;
+}
+
+/* ================= FORM ================= */
+.form-group {
+  margin-bottom: 18px;
+}
+
+input {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 14px 14px;
+  border-radius: 6px;
+  border: 1px solid #9ca3af;
+  font-size: 14px;
+  outline: none;
+  background: #ffffff;
+}
+
+input:focus {
+  border-color: #111827;
+}
+
+/* ================= PASSWORD ================= */
+.password-group {
+    /* padding-right: 4px; */
+  position: relative;
+}
+
+.password-group .eye {
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: #374151;
+  font-size: 16px;
+}
+
+/* ================= FORGOT ================= */
+.forgot {
+  margin: 12px 0 26px;
+}
+
+.forgot a {
+  color: #2563eb;
+  font-size: 14px;
+  text-decoration: none;
+}
+
+/* ================= BUTTON ================= */
+.login-btn {
+  width: 160px;
+  padding: 10px 0;
+  border-radius: 6px;
+  border: 1px solid #111827;
+  background: #ffffff;
+  font-size: 16px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.login-btn:hover {
+  background: #111827;
+  color: #ffffff;
+}
+
+.login-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* ================= ERROR ================= */
+.error {
+  margin-top: 14px;
+  color: #dc2626;
+  font-size: 13px;
+}
+
+/* ================= REGISTER ================= */
+.register {
+  margin-top: 24px;
+  font-size: 14px;
+}
+
+.register a {
+  margin-left: 4px;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+/* ================= RESPONSIVE ================= */
+@media (max-width: 480px) {
+  .login-card {
+    width: 90%;
+    padding: 36px 28px;
+  }
+}

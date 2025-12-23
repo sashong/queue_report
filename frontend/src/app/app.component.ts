@@ -1,35 +1,46 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-
+import { Router, NavigationEnd } from '@angular/router';
+import { RouterOutlet } from '@angular/router';
+import { AuthService } from './auth/auth.service';
 import { initializeApp } from 'firebase/app';
-import { getFirestore, collection, getDocs, query, where, doc} from 'firebase/firestore';
+import {
+  getFirestore,
+  collection,
+  getDocs,
+  query,
+  where,
+  doc
+} from 'firebase/firestore';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule,RouterOutlet],
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css']
 })
 export class AppComponent {
-  title(title: any) {
-    throw new Error('Method not implemented.');
-  }
+  showDashboard = false;
 
   /* ================= FIREBASE ================= */
   firebaseConfig = {
-    // api key
+    apiKey: 'AIzaSyAeaYHkue2pxh6kDyTL8w6CSaF9LNbMZHc',
+    authDomain: 'starlabs-test.firebaseapp.com',
+    projectId: 'starlabs-test'
   };
 
   app = initializeApp(this.firebaseConfig);
   db = getFirestore(this.app);
 
-  /* ================= STATE ================= */
   queues: any[] = [];
   selectedQueueId = '';
   loading = false;
   error = '';
+  private lastQueueId = '';
+  reportLoaded = false;
+
 
   allRecords: any[] = [];
   filteredRecords: any[] = [];
@@ -48,6 +59,18 @@ export class AppComponent {
 
   activeFilter: 'status' | 'mode' | 'stage' | null = null;
 
+  activeKpiFilter:
+  | 'total'
+  | 'completed'
+  | 'initiated'
+  | 'ongoing'
+  | 'cancelled'
+  | 'failed'
+  | 'valid'
+  | 'invalid'
+  | null = null;
+
+
   /* ================= PAGINATION ================= */
   pageSize = 10;
   currentPage = 1;
@@ -57,13 +80,74 @@ export class AppComponent {
   dashboard = {
     total: 0,
     completed: 0,
+    initiated:0,
+    cancelled:0,
     ongoing: 0,
+    valid:0,
     failed: 0
   };
 
-  constructor() {
-    this.loadQueues();
+  productStatusKpis: { key: string; count: number }[] = [];
+
+validCount = 0;
+invalidCount = 0;
+
+  constructor(
+  private authService: AuthService,
+  private router: Router
+) {
+  if (!this.authService.isLoggedIn()) {
+    this.showDashboard = false;
+    this.router.navigate(['/login']);
+    return;
   }
+
+  this.showDashboard = true;
+  this.loadQueues();
+}
+
+
+  /* ================= LOGOUT ================= */
+  logout() {
+    this.showDashboard = false;
+    this.authService.logout();
+  }
+
+  onKpiClick(type: 'completed' | 'ongoing' |'initiated'|'cancelled'| 'failed' | 'valid' | 'invalid') {
+  this.activeKpiFilter = this.activeKpiFilter === type ? null : type;
+  this.applyFilters();
+}
+
+
+  onQueueChange() {
+   if (!this.selectedQueueId || this.selectedQueueId === this.lastQueueId) {
+    this.reportLoaded = false;
+
+    this.allRecords = [];
+    this.filteredRecords = [];
+    this.paginatedRecords = [];
+    this.validationFailures = [];
+    this.activeKpiFilter = null;
+
+
+    this.dashboard = {
+      total: 0,
+      completed: 0,
+      initiated:0,
+      cancelled:0,
+      ongoing: 0,
+      valid:0,
+      failed: 0
+    };
+
+    return;
+  }
+  this.lastQueueId = this.selectedQueueId;
+  this.reportLoaded = false;
+  this.loadReport();
+}
+
+
 
   /* ================= LOAD QUEUES ================= */
   async loadQueues() {
@@ -101,7 +185,6 @@ export class AppComponent {
       for (const tokenDoc of tokenSnap.docs) {
         const token = tokenDoc.data();
 
-        /* ---------- FETCH PARTICIPANT PRODUCT ---------- */
         const ppSnap = await getDocs(
           query(
             collection(this.db, 'participantsproduct'),
@@ -120,7 +203,7 @@ export class AppComponent {
           integrationMode = pp['integrationMode'] ?? pp['mode'] ?? '-';
         }
 
-        const record = {
+        const record: any = {
           tokenId: tokenDoc.id,
           participantName: token['profile_name'] ?? '-',
           productName: token['productname'] ?? '-',
@@ -128,38 +211,28 @@ export class AppComponent {
           integrationMode,
           tokenStage: token['currentstage'] ?? '-',
           validationPassed: true,
-          validationReason: null as string | null
+          validationReason: null
         };
 
         const failures: string[] = [];
 
-/* ---------- CHECK 1: CURRENT STAGE ---------- */
-if (record.tokenStage === 'Completed' && record.productStatus !== 'completed') {
-  failures.push(
-    'Stage is completed but product status is not completed'
-  );
-}
+        if (record.tokenStage === 'Completed' && record.productStatus !== 'completed') {
+          failures.push('Stage is completed but product status is not completed');
+        }
 
-/* ---------- CHECK 2: PRODUCT STATUS ---------- */
-if (!record.productStatus || record.productStatus === '-') {
-  failures.push('Product status is missing');
-}
+        if (!record.productStatus || record.productStatus === '-') {
+          failures.push('Product status is missing');
+        }
 
-/* ---------- CHECK 3: INTEGRATION MODE ---------- */
-if (!record.integrationMode || record.integrationMode === '-') {
-  failures.push('Integration mode is missing');
-}
+        if (!record.integrationMode || record.integrationMode === '-') {
+          failures.push('Integration mode is missing');
+        }
 
-/* ---------- FINAL DECISION ---------- */
-if (failures.length > 0) {
-  record.validationPassed = false;
-  record.validationReason = failures.join(' | ');
-  this.validationFailures.push(record);
-} else {
-  record.validationPassed = true;
-  record.validationReason = null;
-}
-
+        if (failures.length > 0) {
+          record.validationPassed = false;
+          record.validationReason = failures.join(' | ');
+          this.validationFailures.push(record);
+        }
 
         this.allRecords.push(record);
       }
@@ -167,6 +240,7 @@ if (failures.length > 0) {
       this.prepareFilters();
       this.applyFilters();
       this.prepareDashboard();
+      this.reportLoaded = true;
 
     } catch (e) {
       console.error(e);
@@ -176,7 +250,7 @@ if (failures.length > 0) {
     }
   }
 
-  /* ================= FILTER OPTIONS ================= */
+  /* ================= FILTERS ================= */
   prepareFilters() {
     const build = (key: string) => {
       const map: any = {};
@@ -192,22 +266,70 @@ if (failures.length > 0) {
     this.stageOptions = build('tokenStage');
   }
 
-  /* ================= APPLY FILTERS ================= */
   applyFilters() {
-    this.filteredRecords = this.allRecords.filter(r =>
-      (!this.selectedProductStatus || r.productStatus === this.selectedProductStatus) &&
-      (!this.selectedIntegrationMode || r.integrationMode === this.selectedIntegrationMode) &&
-      (!this.selectedStage || r.tokenStage === this.selectedStage) &&
-      (!this.searchText ||
-        Object.values(r)
-          .join(' ')
-          .toLowerCase()
-          .includes(this.searchText.toLowerCase()))
-    );
+  this.filteredRecords = this.allRecords.filter(r => {
 
-    this.currentPage = 1;
-    this.calculatePagination();
-  }
+    /* ================= KPI FILTERS ================= */
+
+    if (this.activeKpiFilter === 'completed' && r.productStatus !== 'completed') {
+      return false;
+    }
+
+    if (this.activeKpiFilter === 'initiated' && r.productStatus !== 'initiated') {
+      return false;
+    }
+
+    if (this.activeKpiFilter === 'ongoing' && r.productStatus !== 'ongoing') {
+      return false;
+    }
+
+    if (this.activeKpiFilter === 'cancelled' && r.productStatus !== 'cancelled') {
+      return false;
+    }
+
+    if (this.activeKpiFilter === 'failed' && r.validationPassed !== false) {
+      return false;
+    }
+
+    if (this.activeKpiFilter === 'valid' && r.validationPassed !== true) {
+      return false;
+    }
+
+    if (this.activeKpiFilter === 'invalid' && r.validationPassed !== false) {
+      return false;
+    }
+
+    /* ================= EXISTING FILTERS ================= */
+
+    if (this.selectedProductStatus && r.productStatus !== this.selectedProductStatus) {
+      return false;
+    }
+
+    if (this.selectedIntegrationMode && r.integrationMode !== this.selectedIntegrationMode) {
+      return false;
+    }
+
+    if (this.selectedStage && r.tokenStage !== this.selectedStage) {
+      return false;
+    }
+
+    if (
+      this.searchText &&
+      !Object.values(r)
+        .join(' ')
+        .toLowerCase()
+        .includes(this.searchText.toLowerCase())
+    ) {
+      return false;
+    }
+
+    return true; 
+  });
+
+  this.currentPage = 1;
+  this.calculatePagination();
+}
+
 
   resetFilter(type: 'status' | 'mode' | 'stage') {
     if (type === 'status') this.selectedProductStatus = '';
@@ -216,7 +338,6 @@ if (failures.length > 0) {
     this.applyFilters();
   }
 
-  /* ================= PAGINATION ================= */
   calculatePagination() {
     this.totalPages = Math.ceil(this.filteredRecords.length / this.pageSize);
     this.updatePage();
@@ -241,15 +362,16 @@ if (failures.length > 0) {
     }
   }
 
-  /* ================= KPI ================= */
   prepareDashboard() {
     this.dashboard.total = this.allRecords.length;
     this.dashboard.completed = this.allRecords.filter(r => r.productStatus === 'completed').length;
     this.dashboard.ongoing = this.allRecords.filter(r => r.productStatus === 'ongoing').length;
+    this.dashboard.initiated = this.allRecords.filter(r => r.productStatus === 'initiated').length;
+    this.dashboard.cancelled = this.allRecords.filter(r=>r.productStatus === 'cancelled').length;
+    this.dashboard.valid = this.validCount;
     this.dashboard.failed = this.validationFailures.length;
   }
 
-  /* ================= EXPORT ================= */
   exportCSV() {
     const rows = this.filteredRecords.map(r =>
       `${r.participantName},${r.productName},${r.productStatus},${r.integrationMode},${r.tokenStage},${r.validationPassed ? 'Valid' : 'Invalid'}`
@@ -267,7 +389,6 @@ if (failures.length > 0) {
     a.click();
   }
 
-  /* ================= FILTER UI ================= */
   toggleFilter(type: 'status' | 'mode' | 'stage') {
     this.activeFilter = this.activeFilter === type ? null : type;
   }
@@ -276,4 +397,3 @@ if (failures.length > 0) {
     this.activeFilter = null;
   }
 }
-

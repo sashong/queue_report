@@ -1,137 +1,170 @@
-<div class="container">
+<div class="container" *ngIf="showDashboard">
+
+  <button (click)="logout()" style="float:right">Logout</button>
 
   <h1>Queue Status Dashboard</h1>
 
+  <div class="loading-overlay" *ngIf="loading">
+    <div class="spinner"></div>
+  </div>
+
   <!-- KPI DASHBOARD -->
-  <div class="kpi-grid">
-    <div class="kpi">
-      <div class="kpi-value">{{ dashboard.total }}</div>
-      <div class="kpi-label">Total Records</div>
-    </div>
-    <div class="kpi success">
-      <div class="kpi-value">{{ dashboard.completed }}</div>
-      <div class="kpi-label">Completed</div>
-    </div>
-    <div class="kpi info">
-      <div class="kpi-value">{{ dashboard.ongoing }}</div>
-      <div class="kpi-label">Ongoing</div>
-    </div>
-    <div class="kpi danger">
-      <div class="kpi-value">{{ dashboard.failed }}</div>
-      <div class="kpi-label">Validation Failed</div>
-    </div>
+  <div class="kpi-grid" *ngIf="reportLoaded">
+    <div class="kpi"
+       (click)="activeKpiFilter=null; applyFilters()"
+       [class.active]="activeKpiFilter===null">
+    <div class="kpi-value">{{ dashboard.total }}</div>
+    <div class="kpi-label">Total Records</div>
+  </div>
+
+  <!-- COMPLETED -->
+  <div class="kpi success"
+       (click)="onKpiClick('completed')"
+       [class.active]="activeKpiFilter==='completed'">
+    <div class="kpi-value">{{ dashboard.completed }}</div>
+    <div class="kpi-label">Completed</div>
+  </div>
+
+  <!-- INITIATED -->
+  <div class="kpi info"
+       (click)="onKpiClick('initiated')"
+       [class.active]="activeKpiFilter==='initiated'">
+    <div class="kpi-value">{{ dashboard.initiated }}</div>
+    <div class="kpi-label">Initiated</div>
+  </div>
+
+  <!-- ONGOING -->
+  <div class="kpi info"
+       (click)="onKpiClick('ongoing')"
+       [class.active]="activeKpiFilter==='ongoing'">
+    <div class="kpi-value">{{ dashboard.ongoing }}</div>
+    <div class="kpi-label">Ongoing</div>
+  </div>
+
+  <!-- CANCELLED -->
+  <div class="kpi info"
+       (click)="onKpiClick('cancelled')"
+       [class.active]="activeKpiFilter==='cancelled'">
+    <div class="kpi-value">{{ dashboard.cancelled }}</div>
+    <div class="kpi-label">Cancelled</div>
+  </div>
+
+  <!-- VALID -->
+  <div class="kpi danger"
+       (click)="onKpiClick('valid')"
+       [class.active]="activeKpiFilter==='valid'">
+    <div class="kpi-value">{{ dashboard.total - dashboard.failed }}</div>
+    <div class="kpi-label">Valid</div>
+  </div>
+
+  <!-- INVALID -->
+  <div class="kpi danger"
+       (click)="onKpiClick('invalid')"
+       [class.active]="activeKpiFilter==='invalid'">
+    <div class="kpi-value">{{ dashboard.failed }}</div>
+    <div class="kpi-label">Invalid</div>
+  </div>
+  
   </div>
 
   <!-- QUEUE SELECT -->
   <div class="card action-row">
+    <div class="left-actions">
+      <select [(ngModel)]="selectedQueueId" (change)="onQueueChange()">
+        <option value="">Select Queue</option>
+        <option *ngFor="let q of queues" [value]="q.id">
+          {{ q.queuename }}
+        </option>
+      </select>
+    </div>
 
-  <!-- LEFT SIDE -->
-  <div class="left-actions">
-    <select [(ngModel)]="selectedQueueId">
-      <option value="">Select Queue</option>
-      <option *ngFor="let q of queues" [value]="q.id">
-        {{ q.queuename }}
-      </option>
-    </select>
+    <div class="right-actions">
+      <input
+        type="text"
+        placeholder="Search..."
+        [(ngModel)]="searchText"
+        (input)="applyFilters()" />
 
-    <button
-      class="btn-primary"
-      (click)="loadReport()"
-      [disabled]="loading || !selectedQueueId">
-      <span *ngIf="!loading">Load Report</span>
-      <span *ngIf="loading" class="btn-spinner"></span>
-    </button>
+      <button class="btn-outline" (click)="exportCSV()">
+        Export CSV
+      </button>
+    </div>
   </div>
+  
+  <div class="table-wrapper">
+    <table *ngIf="reportLoaded && paginatedRecords.length > 0">
+      <thead>
+        <tr>
+          <th>Participant</th>
+          <th>Product</th>
+          <th class="filter-header">
+            Product Status
+            <span (click)="toggleFilter('status')">▼</span>
+            <select *ngIf="activeFilter==='status'"
+                    [(ngModel)]="selectedProductStatus"
+                    (change)="applyFilters(); closeFilter()">
+              <option value="">All</option>
+              <option *ngFor="let o of productStatusOptions" [value]="o.value">
+                {{ o.value }} ({{ o.count }})
+              </option>
+            </select>
+          </th>
 
-  <!-- RIGHT SIDE -->
-  <div class="right-actions">
-    <input
-      type="text"
-      placeholder="Search..."
-      [(ngModel)]="searchText"
-      (input)="applyFilters()" />
+          <th class="filter-header">
+            Mode
+            <span (click)="toggleFilter('mode')">▼</span>
+            <select *ngIf="activeFilter==='mode'"
+                    [(ngModel)]="selectedIntegrationMode"
+                    (change)="applyFilters(); closeFilter()">
+              <option value="">All</option>
+              <option *ngFor="let o of integrationModeOptions" [value]="o.value">
+                {{ o.value }} ({{ o.count }})
+              </option>
+            </select>
+          </th>
 
-    <button class="btn-outline" (click)="exportCSV()">
-      Export CSV
-    </button>
+          <th class="filter-header">
+            Stage
+            <span (click)="toggleFilter('stage')">▼</span>
+            <select *ngIf="activeFilter==='stage'"
+                    [(ngModel)]="selectedStage"
+                    (change)="applyFilters(); closeFilter()">
+              <option value="">All</option>
+              <option *ngFor="let o of stageOptions" [value]="o.value">
+                {{ o.value }} ({{ o.count }})
+              </option>
+            </select>
+          </th>
+
+          <th>Validation</th>
+          <th>Reason</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        <tr *ngFor="let r of paginatedRecords">
+          <td>{{ r.participantName }}</td>
+          <td>{{ r.productName }}</td>
+          <td>{{ r.productStatus }}</td>
+          <td>{{ r.integrationMode }}</td>
+          <td>{{ r.tokenStage }}</td>
+          <td>
+            <span class="ok" *ngIf="r.validationPassed">✔ Valid</span>
+            <span class="fail" *ngIf="!r.validationPassed">✖ Invalid</span>
+          </td>
+          <td>{{ r.validationReason }}</td>
+        </tr>
+      </tbody>
+    </table>
   </div>
-
-</div>
-
-  <!-- TABLE -->
-  <table *ngIf="paginatedRecords.length > 0">
-    <thead>
-      <tr>
-        <th>Participant</th>
-        <th>Product</th>
-        
-
-        <th class="filter-header">
-          Product Status
-          <span (click)="toggleFilter('status')">▼</span>
-          <select *ngIf="activeFilter==='status'"
-                  [(ngModel)]="selectedProductStatus"
-                  (change)="applyFilters(); closeFilter()">
-            <option value="">All</option>
-            <option *ngFor="let o of productStatusOptions" [value]="o.value">
-              {{ o.value }} ({{ o.count }})
-            </option>
-          </select>
-        </th>
-
-        <th class="filter-header">
-          Mode
-          <span (click)="toggleFilter('mode')">▼</span>
-          <select *ngIf="activeFilter==='mode'"
-                  [(ngModel)]="selectedIntegrationMode"
-                  (change)="applyFilters(); closeFilter()">
-            <option value="">All</option>
-            <option *ngFor="let o of integrationModeOptions" [value]="o.value">
-              {{ o.value }} ({{ o.count }})
-            </option>
-          </select>
-        </th>
-
-        <th class="filter-header">
-          Stage
-          <span (click)="toggleFilter('stage')">▼</span>
-          <select *ngIf="activeFilter==='stage'"
-                  [(ngModel)]="selectedStage"
-                  (change)="applyFilters(); closeFilter()">
-            <option value="">All</option>
-            <option *ngFor="let o of stageOptions" [value]="o.value">
-              {{ o.value }} ({{ o.count }})
-            </option>
-          </select>
-        </th>
-
-        <th>Validation</th>
-        <th>Reason</th>
-      </tr>
-    </thead>
-
-    <tbody>
-      <tr *ngFor="let r of paginatedRecords">
-        <td>{{ r.participantName }}</td>
-        <td>{{ r.productName }}</td>
-        
-        <td>{{ r.productStatus }}</td>
-        <td>{{ r.integrationMode }}</td>
-        <td>{{ r.tokenStage }}</td>
-        <td>
-          <span class="ok" *ngIf="r.validationPassed">✔ Valid</span>
-          <span class="fail" *ngIf="!r.validationPassed">✖ Invalid</span>
-        </td>
-        <td>{{r.validationReason}}</td>
-      </tr>
-    </tbody>
-  </table>
 
   <!-- PAGINATION -->
-  <div class="pagination" *ngIf="totalPages > 1">
+  <div class="pagination" *ngIf="reportLoaded && totalPages > 1">
     <button (click)="prevPage()">Prev</button>
     Page {{ currentPage }} / {{ totalPages }}
     <button (click)="nextPage()">Next</button>
   </div>
 
 </div>
+
+<router-outlet *ngIf="!showDashboard"></router-outlet>
