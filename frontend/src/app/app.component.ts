@@ -257,10 +257,12 @@ export class AppComponent {
 
   /* ================= LOAD QUEUES ================= */
 
-  async loadQueues() {
-    const snap = await getDocs(collection(this.db, 'queue generation'));
-    this.queues = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  }
+  async loadQueues() { const snap = await getDocs(collection(this.db, 'queue generation')); 
+    this.queues = snap.docs .map(d => ({ 
+      id: d.id, ...d.data() })) .sort((a: any, b: any) => { 
+        if (!a.queueenddate) return 1; 
+        if (!b.queueenddate) return -1; 
+        return b.queueenddate.toMillis() - a.queueenddate.toMillis(); }); }
 
   /* ================= LOAD REPORT ================= */
 
