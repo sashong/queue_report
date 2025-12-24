@@ -1,10 +1,10 @@
 import { Component } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import { Router, NavigationEnd } from '@angular/router';
-import { RouterOutlet } from '@angular/router';
+import { Router, RouterOutlet } from '@angular/router';
 import { AuthService } from './auth/auth.service';
-import { initializeApp } from 'firebase/app';
+
+import { initializeApp, getApps } from 'firebase/app';
 import {
   getFirestore,
   collection,
@@ -13,34 +13,44 @@ import {
   where,
   doc
 } from 'firebase/firestore';
+import { environment } from '../environments/environments';
 
 @Component({
   selector: 'app-root',
   standalone: true,
-  imports: [CommonModule, FormsModule,RouterOutlet],
+  imports: [CommonModule, FormsModule, RouterOutlet],
   templateUrl: './app.component.html',
   styleUrls: ['./app.component.css']
 })
 export class AppComponent {
+
+  /* ================= FIREBASE (SINGLE INIT) ================= */
+
+  firebaseApp =
+    getApps().length === 0
+      ? initializeApp(environment.firebase)
+      : getApps()[0];
+
+  db = getFirestore(this.firebaseApp);
+
+  /* ================= UI STATE ================= */
+
   showDashboard = false;
-
-  /* ================= FIREBASE ================= */
-  firebaseConfig = {
-    apiKey: 'AIzaSyAeaYHkue2pxh6kDyTL8w6CSaF9LNbMZHc',
-    authDomain: 'starlabs-test.firebaseapp.com',
-    projectId: 'starlabs-test'
-  };
-
-  app = initializeApp(this.firebaseConfig);
-  db = getFirestore(this.app);
-
-  queues: any[] = [];
-  selectedQueueId = '';
   loading = false;
   error = '';
-  private lastQueueId = '';
+
+  /* ================= QUEUE ================= */
+
+  queues: any[] = [];
+  filteredQueues: any[] = [];
+  selectedQueueId = '';
+  lastQueueId = '';
+
+  showQueueDropdown = false;
+  queueSearchText = '';
   reportLoaded = false;
 
+  /* ================= DATA ================= */
 
   allRecords: any[] = [];
   filteredRecords: any[] = [];
@@ -48,138 +58,214 @@ export class AppComponent {
   validationFailures: any[] = [];
 
   /* ================= FILTERS ================= */
+
   selectedProductStatus = '';
   selectedIntegrationMode = '';
   selectedStage = '';
   searchText = '';
 
-  productStatusOptions: { value: string; count: number }[] = [];
-  integrationModeOptions: { value: string; count: number }[] = [];
-  stageOptions: { value: string; count: number }[] = [];
+  productStatusOptions: any[] = [];
+  integrationModeOptions: any[] = [];
+  stageOptions: any[] = [];
 
   activeFilter: 'status' | 'mode' | 'stage' | null = null;
 
   activeKpiFilter:
-  | 'total'
-  | 'completed'
-  | 'initiated'
-  | 'ongoing'
-  | 'cancelled'
-  | 'failed'
-  | 'valid'
-  | 'invalid'
-  | null = null;
-
+    | 'completed'
+    | 'initiated'
+    | 'ongoing'
+    | 'cancelled'
+    | 'valid'
+    | 'invalid'
+    | null = null;
 
   /* ================= PAGINATION ================= */
+
   pageSize = 10;
   currentPage = 1;
   totalPages = 1;
 
   /* ================= KPI ================= */
+
   dashboard = {
     total: 0,
     completed: 0,
-    initiated:0,
-    cancelled:0,
+    initiated: 0,
     ongoing: 0,
-    valid:0,
+    cancelled: 0,
+    valid: 0,
     failed: 0
   };
 
-  productStatusKpis: { key: string; count: number }[] = [];
-
-validCount = 0;
-invalidCount = 0;
-
   constructor(
-  private authService: AuthService,
-  private router: Router
-) {
-  if (!this.authService.isLoggedIn()) {
-    this.showDashboard = false;
-    this.router.navigate(['/login']);
-    return;
+    private authService: AuthService,
+    private router: Router
+  ) {
+    if (!this.authService.isLoggedIn()) {
+      this.router.navigate(['/login']);
+      return;
+    }
+
+    this.showDashboard = true;
+    this.loadQueues();
   }
 
-  this.showDashboard = true;
-  this.loadQueues();
+  /* =========================================================
+     VALIDATION — ONLY 2 CASES ARE VALID
+     ========================================================= */
+
+  validateRecord(
+    productStatus: string,
+    tokenStage: string,
+    integrationMode: string
+  ): { passed: boolean; reason: string } {
+
+    const status = (productStatus || '').toLowerCase();
+    const stage = (tokenStage || '').toLowerCase();
+    const mode = (integrationMode || '').toLowerCase();
+
+    // CASE 1 → VALID
+    if (
+      status === 'completed' &&
+      stage === 'completed' &&
+      mode === 'integration mode'
+    ) {
+      return {
+        passed: true,
+        reason: 'Valid: completed via integration mode'
+      };
+    }
+
+
+    // CASE 2 → VALID
+    if (
+      (status !== 'completed')  &&
+      stage !== 'completed' &&
+      mode === 'event mode'
+    ) {
+      return {
+        passed: true,
+        reason: 'Valid: event mode in progress'
+      };
+    }
+
+    // EVERYTHING ELSE → INVALID
+    return {
+      passed: false,
+      reason: `product status is ${status || '-'}, current stage is ${stage || '-'}, mode is ${mode || 'N/A'}`
+    };
+  }
+
+  /* ================= QUEUE DROPDOWN ================= */
+
+  openQueueDropdown() {
+    this.showQueueDropdown = true;
+    this.queueSearchText = '';
+    this.filteredQueues = [...this.queues];
+  }
+
+  filterQueues() {
+    const t = this.queueSearchText.toLowerCase();
+    this.filteredQueues = this.queues.filter(q =>
+      q.queuename.toLowerCase().includes(t)
+    );
+  }
+
+  selectQueue(queue: any) {
+    this.selectedQueueId = queue.id;
+    this.queueSearchText = queue.queuename;
+    this.showQueueDropdown = false;
+    this.onQueueChange();
+  }
+
+  clearQueueIfSelected() {
+    if (this.selectedQueueId) {
+      this.selectedQueueId = '';
+      this.queueSearchText = '';
+      this.filteredQueues = [...this.queues];
+      this.showQueueDropdown = true;
+      this.resetReport();
+    }
+  }
+
+  calculateDashboardCounts() {
+  this.dashboard.total = this.allRecords.length;
+
+  this.dashboard.completed = this.allRecords.filter(
+    r => r.productStatus?.toLowerCase() === 'completed'
+  ).length;
+
+  this.dashboard.initiated = this.allRecords.filter(
+    r => r.productStatus?.toLowerCase() === 'initiated'
+  ).length;
+
+  this.dashboard.ongoing = this.allRecords.filter(
+    r => r.productStatus?.toLowerCase() === 'ongoing'
+  ).length;
+
+  this.dashboard.cancelled = this.allRecords.filter(
+    r => r.productStatus?.toLowerCase() === 'cancelled'
+  ).length;
+
+  this.dashboard.valid = this.allRecords.filter(
+    r => r.validationPassed === true
+  ).length;
+
+  this.dashboard.failed = this.allRecords.filter(
+    r => r.validationPassed === false
+  ).length;
 }
 
 
-  /* ================= LOGOUT ================= */
-  logout() {
-    this.showDashboard = false;
-    this.authService.logout();
-  }
-
-  onKpiClick(type: 'completed' | 'ongoing' |'initiated'|'cancelled'| 'failed' | 'valid' | 'invalid') {
-  this.activeKpiFilter = this.activeKpiFilter === type ? null : type;
-  this.applyFilters();
-}
-
+  /* ================= QUEUE CHANGE ================= */
 
   onQueueChange() {
-   if (!this.selectedQueueId || this.selectedQueueId === this.lastQueueId) {
-    this.reportLoaded = false;
+    if (!this.selectedQueueId || this.selectedQueueId === this.lastQueueId) {
+      this.resetReport();
+      return;
+    }
 
+    this.lastQueueId = this.selectedQueueId;
+    this.loadReport();
+  }
+
+  resetReport() {
+    this.reportLoaded = false;
     this.allRecords = [];
     this.filteredRecords = [];
     this.paginatedRecords = [];
     this.validationFailures = [];
     this.activeKpiFilter = null;
 
-
     this.dashboard = {
       total: 0,
       completed: 0,
-      initiated:0,
-      cancelled:0,
+      initiated: 0,
       ongoing: 0,
-      valid:0,
+      cancelled: 0,
+      valid: 0,
       failed: 0
     };
-
-    return;
   }
-  this.lastQueueId = this.selectedQueueId;
-  this.reportLoaded = false;
-  this.loadReport();
-}
-
-
 
   /* ================= LOAD QUEUES ================= */
+
   async loadQueues() {
     const snap = await getDocs(collection(this.db, 'queue generation'));
-
-    this.queues = snap.docs
-      .map(d => ({ id: d.id, ...d.data() }))
-      .sort((a: any, b: any) => {
-        if (!a.queueenddate) return 1;
-        if (!b.queueenddate) return -1;
-        return b.queueenddate.toMillis() - a.queueenddate.toMillis();
-      });
+    this.queues = snap.docs.map(d => ({ id: d.id, ...d.data() }));
   }
 
   /* ================= LOAD REPORT ================= */
+
   async loadReport() {
-    if (!this.selectedQueueId) return;
-
     this.loading = true;
-    this.error = '';
-
-    this.allRecords = [];
-    this.validationFailures = [];
+    this.resetReport();
 
     try {
       const queueRef = doc(this.db, 'queue generation', this.selectedQueueId);
 
       const tokenSnap = await getDocs(
-        query(
-          collection(this.db, 'queue_token'),
-          where('queueref', '==', queueRef)
-        )
+        query(collection(this.db, 'queue_token'), where('queueref', '==', queueRef))
       );
 
       for (const tokenDoc of tokenSnap.docs) {
@@ -194,53 +280,36 @@ invalidCount = 0;
           )
         );
 
-        let productStatus = '-';
-        let integrationMode = '-';
-
-        if (!ppSnap.empty) {
-          const pp = ppSnap.docs[0].data();
-          productStatus = pp['status'] ?? '-';
-          integrationMode = pp['integrationMode'] ?? pp['mode'] ?? '-';
-        }
+        const pp = ppSnap.empty ? {} : ppSnap.docs[0].data();
 
         const record: any = {
-          tokenId: tokenDoc.id,
           participantName: token['profile_name'] ?? '-',
           productName: token['productname'] ?? '-',
-          productStatus,
-          integrationMode,
-          tokenStage: token['currentstage'] ?? '-',
-          validationPassed: true,
-          validationReason: null
+          productStatus: pp['status'] ?? '-',
+          integrationMode: pp['mode'] ?? '-',
+          tokenStage: token['currentstage'] ?? '-'
         };
 
-        const failures: string[] = [];
+        const validation = this.validateRecord(
+          record.productStatus,
+          record.tokenStage,
+          record.integrationMode
+        );
 
-        if (record.tokenStage === 'Completed' && record.productStatus !== 'completed') {
-          failures.push('Stage is completed but product status is not completed');
-        }
+        record.validationPassed = validation.passed;
+        record.validationReason = validation.reason;
 
-        if (!record.productStatus || record.productStatus === '-') {
-          failures.push('Product status is missing');
-        }
-
-        if (!record.integrationMode || record.integrationMode === '-') {
-          failures.push('Integration mode is missing');
-        }
-
-        if (failures.length > 0) {
-          record.validationPassed = false;
-          record.validationReason = failures.join(' | ');
+        if (!validation.passed) {
           this.validationFailures.push(record);
         }
 
         this.allRecords.push(record);
       }
 
-      this.prepareFilters();
-      this.applyFilters();
       this.prepareDashboard();
+      this.applyFilters();
       this.reportLoaded = true;
+      this.calculateDashboardCounts();
 
     } catch (e) {
       console.error(e);
@@ -250,68 +319,59 @@ invalidCount = 0;
     }
   }
 
-  /* ================= FILTERS ================= */
-  prepareFilters() {
-    const build = (key: string) => {
-      const map: any = {};
-      this.allRecords.forEach(r => {
-        const v = r[key] ?? '-';
-        map[v] = (map[v] || 0) + 1;
-      });
-      return Object.keys(map).map(k => ({ value: k, count: map[k] }));
-    };
+  /* ================= KPI CLICK ================= */
 
-    this.productStatusOptions = build('productStatus');
-    this.integrationModeOptions = build('integrationMode');
-    this.stageOptions = build('tokenStage');
+  onKpiClick(
+    type: 'completed' | 'initiated' | 'ongoing' | 'cancelled' | 'valid' | 'invalid'
+  ) {
+    this.activeKpiFilter = this.activeKpiFilter === type ? null : type;
+    this.applyFilters();
   }
+
+  /* ================= FILTERS ================= */
 
   applyFilters() {
   this.filteredRecords = this.allRecords.filter(r => {
 
     /* ================= KPI FILTERS ================= */
 
-    if (this.activeKpiFilter === 'completed' && r.productStatus !== 'completed') {
+    if (
+      this.activeKpiFilter === 'completed' &&
+      r.productStatus?.toLowerCase() !== 'completed'
+    ) {
       return false;
     }
 
-    if (this.activeKpiFilter === 'initiated' && r.productStatus !== 'initiated') {
+    if (
+      this.activeKpiFilter === 'initiated' &&
+      r.productStatus?.toLowerCase() !== 'initiated'
+    ) {
       return false;
     }
 
-    if (this.activeKpiFilter === 'ongoing' && r.productStatus !== 'ongoing') {
+    if (
+      this.activeKpiFilter === 'ongoing' &&
+      r.productStatus?.toLowerCase() !== 'ongoing'
+    ) {
       return false;
     }
 
-    if (this.activeKpiFilter === 'cancelled' && r.productStatus !== 'cancelled') {
+    if (
+      this.activeKpiFilter === 'cancelled' &&
+      r.productStatus?.toLowerCase() !== 'cancelled'
+    ) {
       return false;
     }
 
-    if (this.activeKpiFilter === 'failed' && r.validationPassed !== false) {
+    if (this.activeKpiFilter === 'valid' && !r.validationPassed) {
       return false;
     }
 
-    if (this.activeKpiFilter === 'valid' && r.validationPassed !== true) {
+    if (this.activeKpiFilter === 'invalid' && r.validationPassed) {
       return false;
     }
 
-    if (this.activeKpiFilter === 'invalid' && r.validationPassed !== false) {
-      return false;
-    }
-
-    /* ================= EXISTING FILTERS ================= */
-
-    if (this.selectedProductStatus && r.productStatus !== this.selectedProductStatus) {
-      return false;
-    }
-
-    if (this.selectedIntegrationMode && r.integrationMode !== this.selectedIntegrationMode) {
-      return false;
-    }
-
-    if (this.selectedStage && r.tokenStage !== this.selectedStage) {
-      return false;
-    }
+    /* ================= SEARCH ================= */
 
     if (
       this.searchText &&
@@ -323,7 +383,7 @@ invalidCount = 0;
       return false;
     }
 
-    return true; 
+    return true;
   });
 
   this.currentPage = 1;
@@ -331,12 +391,15 @@ invalidCount = 0;
 }
 
 
-  resetFilter(type: 'status' | 'mode' | 'stage') {
-    if (type === 'status') this.selectedProductStatus = '';
-    if (type === 'mode') this.selectedIntegrationMode = '';
-    if (type === 'stage') this.selectedStage = '';
-    this.applyFilters();
+  toggleFilter(type: 'status' | 'mode' | 'stage') {
+    this.activeFilter = this.activeFilter === type ? null : type;
   }
+
+  closeFilter() {
+    this.activeFilter = null;
+  }
+
+  /* ================= PAGINATION ================= */
 
   calculatePagination() {
     this.totalPages = Math.ceil(this.filteredRecords.length / this.pageSize);
@@ -348,13 +411,6 @@ invalidCount = 0;
     this.paginatedRecords = this.filteredRecords.slice(start, start + this.pageSize);
   }
 
-  nextPage() {
-    if (this.currentPage < this.totalPages) {
-      this.currentPage++;
-      this.updatePage();
-    }
-  }
-
   prevPage() {
     if (this.currentPage > 1) {
       this.currentPage--;
@@ -362,15 +418,22 @@ invalidCount = 0;
     }
   }
 
+  nextPage() {
+    if (this.currentPage < this.totalPages) {
+      this.currentPage++;
+      this.updatePage();
+    }
+  }
+
+  /* ================= KPI ================= */
+
   prepareDashboard() {
     this.dashboard.total = this.allRecords.length;
-    this.dashboard.completed = this.allRecords.filter(r => r.productStatus === 'completed').length;
-    this.dashboard.ongoing = this.allRecords.filter(r => r.productStatus === 'ongoing').length;
-    this.dashboard.initiated = this.allRecords.filter(r => r.productStatus === 'initiated').length;
-    this.dashboard.cancelled = this.allRecords.filter(r=>r.productStatus === 'cancelled').length;
-    this.dashboard.valid = this.validCount;
-    this.dashboard.failed = this.validationFailures.length;
+    this.dashboard.valid = this.allRecords.filter(r => r.validationPassed).length;
+    this.dashboard.failed = this.allRecords.filter(r => !r.validationPassed).length;
   }
+
+  /* ================= EXPORT ================= */
 
   exportCSV() {
     const rows = this.filteredRecords.map(r =>
@@ -389,11 +452,10 @@ invalidCount = 0;
     a.click();
   }
 
-  toggleFilter(type: 'status' | 'mode' | 'stage') {
-    this.activeFilter = this.activeFilter === type ? null : type;
-  }
+  /* ================= LOGOUT ================= */
 
-  closeFilter() {
-    this.activeFilter = null;
+  logout() {
+    this.authService.logout();
+    this.router.navigate(['/login']);
   }
 }

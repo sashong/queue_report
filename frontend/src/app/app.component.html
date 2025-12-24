@@ -70,21 +70,37 @@
   <!-- QUEUE SELECT -->
   <div class="card action-row">
     <div class="left-actions">
-      <select [(ngModel)]="selectedQueueId" (change)="onQueueChange()">
-        <option value="">Select Queue</option>
-        <option *ngFor="let q of queues" [value]="q.id">
-          {{ q.queuename }}
-        </option>
-      </select>
+      <div class="queue-select-wrapper">
+
+    <!-- SEARCHABLE DROPDOWN INPUT -->
+    <input
+      type="text"
+      class="queue-input"
+      placeholder="Select Queue"
+      [(ngModel)]="queueSearchText"
+      (focus)="openQueueDropdown()"
+      (input)="filterQueues()"
+      (click)="clearQueueIfSelected()"
+    />
+
+    <!-- DROPDOWN LIST -->
+    <div class="queue-menu" *ngIf="showQueueDropdown">
+      <div
+        class="queue-item"
+        *ngFor="let q of filteredQueues"
+        (click)="selectQueue(q)">
+        {{ q.queuename }}
+      </div>
+
+      <div class="no-result" *ngIf="filteredQueues.length === 0">
+        No queues found
+      </div>
+    </div>
+  </div>
     </div>
 
     <div class="right-actions">
-      <input
-        type="text"
-        placeholder="Search..."
-        [(ngModel)]="searchText"
-        (input)="applyFilters()" />
-
+      <input type="text" placeholder="Search..."  [(ngModel)]="searchText"  (input)="applyFilters()" />
       <button class="btn-outline" (click)="exportCSV()">
         Export CSV
       </button>
