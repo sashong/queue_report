@@ -77,12 +77,12 @@
         />
 
         <div class="queue-dropdown" *ngIf="showQueueDropdown">
-          <div
-            class="queue-option"
-            *ngFor="let q of filteredQueues"
-            (click)="selectQueue(q)">
-            {{ q.queuename }}
-          </div>
+        <div
+          class="queue-option"
+          *ngFor="let q of filteredQueues; trackBy: trackByQueueId"
+          (click)="selectQueue(q)">
+          {{ q.queuename }}
+        </div>
 
           <div class="no-results" *ngIf="filteredQueues.length === 0">
             No queues found

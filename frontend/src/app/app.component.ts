@@ -160,11 +160,14 @@ export class AppComponent {
 
 
   selectQueue(queue: any) {
+    console.log('Clicked queue:', queue.queuename, queue.id);
+
   this.selectedQueueId = queue.id;
   this.queueSearchText = queue.queuename;
   this.showQueueDropdown = false;
   this.onQueueChange();
 }
+
 
   clearQueueIfSelected() {
     if (this.selectedQueueId) {
@@ -227,14 +230,24 @@ export class AppComponent {
   /* ================= QUEUE CHANGE ================= */
 
   onQueueChange() {
-    if (!this.selectedQueueId || this.selectedQueueId === this.lastQueueId) {
-      this.resetReport();
-      return;
-    }
-
-    this.lastQueueId = this.selectedQueueId;
-    this.loadReport();
+  if (!this.selectedQueueId || this.selectedQueueId === this.lastQueueId) {
+    return;
   }
+
+  const queueId = this.selectedQueueId; // 🔒 freeze
+  this.lastQueueId = queueId;
+
+  //console.log('Queue selected:', queueId);
+
+  this.loadReport(queueId);
+}
+
+trackByQueueId(index: number, queue: any) {
+  return queue.id;
+}
+
+
+
 
   resetReport() {
     this.reportLoaded = false;
@@ -266,7 +279,8 @@ export class AppComponent {
 
   /* ================= LOAD REPORT ================= */
 
-  async loadReport() {
+  async loadReport(queueId: string) {
+    //console.log('loadReport called with queueId:', queueId);
     this.loading = true;
     this.resetReport();
 
@@ -294,7 +308,7 @@ export class AppComponent {
             token['productref'] === pp['productref']
           );
         });
-
+        //console.log('Selected Queue ID:', this.selectedQueueId);
         if (!matchedPpDoc) {
           continue;
         }
@@ -338,8 +352,11 @@ export class AppComponent {
     } finally {
       this.loading = false;
     }
-
+//console.log();
   }
+
+  
+  
 
   /* ================= KPI CLICK ================= */
 
