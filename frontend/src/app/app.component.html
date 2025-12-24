@@ -11,147 +11,108 @@
   <!-- KPI DASHBOARD -->
   <div class="kpi-grid" *ngIf="reportLoaded">
     <div class="kpi"
-       (click)="activeKpiFilter=null; applyFilters()"
-       [class.active]="activeKpiFilter===null">
-    <div class="kpi-value">{{ dashboard.total }}</div>
-    <div class="kpi-label">Total Records</div>
-  </div>
+         (click)="activeKpiFilter=null; applyFilters()"
+         [class.active]="activeKpiFilter===null">
+      <div class="kpi-value">{{ dashboard.total }}</div>
+      <div class="kpi-label">Total Records</div>
+    </div>
 
-  <!-- COMPLETED -->
-  <div class="kpi success"
-       (click)="onKpiClick('completed')"
-       [class.active]="activeKpiFilter==='completed'">
-    <div class="kpi-value">{{ dashboard.completed }}</div>
-    <div class="kpi-label">Completed</div>
-  </div>
+    <div class="kpi"
+         (click)="onKpiClick('completed')"
+         [class.active]="activeKpiFilter==='completed'">
+      <div class="kpi-value">{{ dashboard.completed }}</div>
+      <div class="kpi-label">Completed</div>
+    </div>
 
-  <!-- INITIATED -->
-  <div class="kpi info"
-       (click)="onKpiClick('initiated')"
-       [class.active]="activeKpiFilter==='initiated'">
-    <div class="kpi-value">{{ dashboard.initiated }}</div>
-    <div class="kpi-label">Initiated</div>
-  </div>
+    <div class="kpi"
+         (click)="onKpiClick('initiated')"
+         [class.active]="activeKpiFilter==='initiated'">
+      <div class="kpi-value">{{ dashboard.initiated }}</div>
+      <div class="kpi-label">Initiated</div>
+    </div>
 
-  <!-- ONGOING -->
-  <div class="kpi info"
-       (click)="onKpiClick('ongoing')"
-       [class.active]="activeKpiFilter==='ongoing'">
-    <div class="kpi-value">{{ dashboard.ongoing }}</div>
-    <div class="kpi-label">Ongoing</div>
-  </div>
+    <div class="kpi"
+         (click)="onKpiClick('ongoing')"
+         [class.active]="activeKpiFilter==='ongoing'">
+      <div class="kpi-value">{{ dashboard.ongoing }}</div>
+      <div class="kpi-label">Ongoing</div>
+    </div>
 
-  <!-- CANCELLED -->
-  <div class="kpi info"
-       (click)="onKpiClick('cancelled')"
-       [class.active]="activeKpiFilter==='cancelled'">
-    <div class="kpi-value">{{ dashboard.cancelled }}</div>
-    <div class="kpi-label">Cancelled</div>
-  </div>
+    <div class="kpi"
+         (click)="onKpiClick('cancelled')"
+         [class.active]="activeKpiFilter==='cancelled'">
+      <div class="kpi-value">{{ dashboard.cancelled }}</div>
+      <div class="kpi-label">Cancelled</div>
+    </div>
 
-  <!-- VALID -->
-  <div class="kpi danger"
-       (click)="onKpiClick('valid')"
-       [class.active]="activeKpiFilter==='valid'">
-    <div class="kpi-value">{{ dashboard.total - dashboard.failed }}</div>
-    <div class="kpi-label">Valid</div>
-  </div>
+    <div class="kpi"
+         (click)="onKpiClick('valid')"
+         [class.active]="activeKpiFilter==='valid'">
+      <div class="kpi-value">{{ dashboard.total - dashboard.failed }}</div>
+      <div class="kpi-label">Valid</div>
+    </div>
 
-  <!-- INVALID -->
-  <div class="kpi danger"
-       (click)="onKpiClick('invalid')"
-       [class.active]="activeKpiFilter==='invalid'">
-    <div class="kpi-value">{{ dashboard.failed }}</div>
-    <div class="kpi-label">Invalid</div>
-  </div>
-  
-  </div>
-
-  <!-- QUEUE SELECT -->
-  <div class="card action-row">
-    <div class="left-actions">
-      <div class="queue-select-wrapper">
-
-    <!-- SEARCHABLE DROPDOWN INPUT -->
-    <input
-      type="text"
-      class="queue-input"
-      placeholder="Select Queue"
-      [(ngModel)]="queueSearchText"
-      (focus)="openQueueDropdown()"
-      (input)="filterQueues()"
-      (click)="clearQueueIfSelected()"
-    />
-
-    <!-- DROPDOWN LIST -->
-    <div class="queue-menu" *ngIf="showQueueDropdown">
-      <div
-        class="queue-item"
-        *ngFor="let q of filteredQueues"
-        (click)="selectQueue(q)">
-        {{ q.queuename }}
-      </div>
-
-      <div class="no-result" *ngIf="filteredQueues.length === 0">
-        No queues found
-      </div>
+    <div class="kpi"
+         (click)="onKpiClick('invalid')"
+         [class.active]="activeKpiFilter==='invalid'">
+      <div class="kpi-value">{{ dashboard.failed }}</div>
+      <div class="kpi-label">Invalid</div>
     </div>
   </div>
+
+  <!-- ACTION ROW -->
+  <div class="card action-row">
+    <div class="left-actions">
+
+      <!-- QUEUE SELECT (UNCHANGED LOGIC) -->
+      <div class="queue-select-container">
+        <input
+          type="text"
+          class="queue-input"
+          placeholder="Select Queue"
+          [(ngModel)]="queueSearchText"
+          (focus)="openQueueDropdown()"
+          (input)="filterQueues()"
+          [readonly]="!showQueueDropdown"
+        />
+
+        <div class="queue-dropdown" *ngIf="showQueueDropdown">
+          <div
+            class="queue-option"
+            *ngFor="let q of filteredQueues"
+            (click)="selectQueue(q)">
+            {{ q.queuename }}
+          </div>
+
+          <div class="no-results" *ngIf="filteredQueues.length === 0">
+            No queues found
+          </div>
+        </div>
+      </div>
+
     </div>
 
     <div class="right-actions">
-      <input type="text" placeholder="Search..."  [(ngModel)]="searchText"  (input)="applyFilters()" />
-      <button class="btn-outline" (click)="exportCSV()">
-        Export CSV
-      </button>
+      <input
+        type="text"
+        placeholder="Search..."
+        [(ngModel)]="searchText"
+        (input)="applyFilters()" />
+
+      <button class="btn-outline" (click)="exportCSV()">Export CSV</button>
     </div>
   </div>
-  
+
+  <!-- TABLE -->
   <div class="table-wrapper">
     <table *ngIf="reportLoaded && paginatedRecords.length > 0">
       <thead>
         <tr>
           <th>Participant</th>
           <th>Product</th>
-          <th class="filter-header">
-            Product Status
-            <span (click)="toggleFilter('status')">▼</span>
-            <select *ngIf="activeFilter==='status'"
-                    [(ngModel)]="selectedProductStatus"
-                    (change)="applyFilters(); closeFilter()">
-              <option value="">All</option>
-              <option *ngFor="let o of productStatusOptions" [value]="o.value">
-                {{ o.value }} ({{ o.count }})
-              </option>
-            </select>
-          </th>
-
-          <th class="filter-header">
-            Mode
-            <span (click)="toggleFilter('mode')">▼</span>
-            <select *ngIf="activeFilter==='mode'"
-                    [(ngModel)]="selectedIntegrationMode"
-                    (change)="applyFilters(); closeFilter()">
-              <option value="">All</option>
-              <option *ngFor="let o of integrationModeOptions" [value]="o.value">
-                {{ o.value }} ({{ o.count }})
-              </option>
-            </select>
-          </th>
-
-          <th class="filter-header">
-            Stage
-            <span (click)="toggleFilter('stage')">▼</span>
-            <select *ngIf="activeFilter==='stage'"
-                    [(ngModel)]="selectedStage"
-                    (change)="applyFilters(); closeFilter()">
-              <option value="">All</option>
-              <option *ngFor="let o of stageOptions" [value]="o.value">
-                {{ o.value }} ({{ o.count }})
-              </option>
-            </select>
-          </th>
-
+          <th>Product Status</th>
+          <th>Mode</th>
+          <th>Stage</th>
           <th>Validation</th>
           <th>Reason</th>
         </tr>

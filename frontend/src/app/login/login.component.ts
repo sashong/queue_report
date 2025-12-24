@@ -28,7 +28,7 @@ export class LoginComponent {
     this.loading = true;
 
     try {
-      await this.authService.login(this.email, this.password);
+      await this.authService.login();
       this.router.navigate(['/']);
     } catch (err: any) {
       this.error = err.message || 'Login failed';

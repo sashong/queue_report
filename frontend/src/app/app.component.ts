@@ -1,18 +1,11 @@
-import { Component } from '@angular/core';
+import { Component , HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterOutlet } from '@angular/router';
 import { AuthService } from './auth/auth.service';
 
 import { initializeApp, getApps } from 'firebase/app';
-import {
-  getFirestore,
-  collection,
-  getDocs,
-  query,
-  where,
-  doc
-} from 'firebase/firestore';
+import { getFirestore, collection, getDocs, query, where, doc } from 'firebase/firestore';
 import { environment } from '../environments/environments';
 
 @Component({
@@ -26,11 +19,7 @@ export class AppComponent {
 
   /* ================= FIREBASE (SINGLE INIT) ================= */
 
-  firebaseApp =
-    getApps().length === 0
-      ? initializeApp(environment.firebase)
-      : getApps()[0];
-
+  firebaseApp = getApps().length === 0 ? initializeApp(environment.firebase) : getApps()[0];
   db = getFirestore(this.firebaseApp);
 
   /* ================= UI STATE ================= */
@@ -110,9 +99,7 @@ export class AppComponent {
     this.loadQueues();
   }
 
-  /* =========================================================
-     VALIDATION — ONLY 2 CASES ARE VALID
-     ========================================================= */
+  /* VALIDATION — ONLY 2 CASES ARE VALID */
 
   validateRecord(
     productStatus: string,
@@ -139,7 +126,7 @@ export class AppComponent {
 
     // CASE 2 → VALID
     if (
-      (status !== 'completed')  &&
+      (status != 'completed')  &&
       stage !== 'completed' &&
       mode === 'event mode'
     ) {
@@ -165,18 +152,19 @@ export class AppComponent {
   }
 
   filterQueues() {
-    const t = this.queueSearchText.toLowerCase();
+    const text = this.queueSearchText.toLowerCase();
     this.filteredQueues = this.queues.filter(q =>
-      q.queuename.toLowerCase().includes(t)
+      q.queuename.toLowerCase().includes(text)
     );
   }
 
+
   selectQueue(queue: any) {
-    this.selectedQueueId = queue.id;
-    this.queueSearchText = queue.queuename;
-    this.showQueueDropdown = false;
-    this.onQueueChange();
-  }
+  this.selectedQueueId = queue.id;
+  this.queueSearchText = queue.queuename;
+  this.showQueueDropdown = false;
+  this.onQueueChange();
+}
 
   clearQueueIfSelected() {
     if (this.selectedQueueId) {
@@ -187,6 +175,25 @@ export class AppComponent {
       this.resetReport();
     }
   }
+
+  @HostListener('document:click', ['$event'])
+  handleOutsideClick(event: MouseEvent) {
+    const target = event.target as HTMLElement;
+
+    // If click is inside queue selector → do nothing
+    if (target.closest('.queue-select-container')) {
+      return;
+    }
+
+    // Clicked outside
+    this.showQueueDropdown = false;
+
+    // If no queue selected, clear search text
+    if (!this.selectedQueueId) {
+      this.queueSearchText = '';
+    }
+  }
+
 
   calculateDashboardCounts() {
   this.dashboard.total = this.allRecords.length;

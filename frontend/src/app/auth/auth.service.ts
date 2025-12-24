@@ -28,17 +28,28 @@ export class AuthService {
     });
   }
 
-  login(email: string, password: string) {
-    return signInWithEmailAndPassword(this.auth, email, password);
-  }
+  private readonly LOGIN_KEY = 'isLoggedIn';
 
-  logout() {
-    return signOut(this.auth);
-  }
+    login() {
+    if (typeof window !== 'undefined') {
+        localStorage.setItem(this.LOGIN_KEY, 'true');
+    }
+    }
 
-  isLoggedIn(): boolean {
-    return !!this.currentUser;
-  }
+    logout() {
+    if (typeof window !== 'undefined') {
+        localStorage.removeItem(this.LOGIN_KEY);
+    }
+    }
+
+
+    isLoggedIn(): boolean {
+    if (typeof window === 'undefined') {
+        return false; 
+    }
+    return localStorage.getItem(this.LOGIN_KEY) === 'true';
+    }
+
 
   getUser(): User | null {
     return this.currentUser;
