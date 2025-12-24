@@ -272,24 +272,35 @@ export class AppComponent {
 
     try {
       const queueRef = doc(this.db, 'queue generation', this.selectedQueueId);
-
       const tokenSnap = await getDocs(
-        query(collection(this.db, 'queue_token'), where('queueref', '==', queueRef))
+        query(
+          collection(this.db, 'queue_token'),where('queueref', '==', queueRef),where('tokenstatus', '==', 'Active'), where('stagestatus', '==', 'Approved')
+        )
+      );
+      const ppSnap = await getDocs(
+        query(
+          collection(this.db, 'participantsproduct'), where('eventref', '==', queueRef)
+        )
       );
 
       for (const tokenDoc of tokenSnap.docs) {
         const token = tokenDoc.data();
+        //console.log(token);
+        const matchedPpDoc = ppSnap.docs.find(ppDoc => {
+          const pp = ppDoc.data();
+          //console.log(pp);
+          return (
+            token['profile_id'] === pp['profileid'] &&
+            token['productref'] === pp['productref']
+          );
+        });
 
-        const ppSnap = await getDocs(
-          query(
-            collection(this.db, 'participantsproduct'),
-            where('eventref', '==', queueRef),
-            where('profileid', '==', token['profile_id']),
-            where('productref', '==', token['productref'])
-          )
-        );
+        if (!matchedPpDoc) {
+          continue;
+        }
 
-        const pp = ppSnap.empty ? {} : ppSnap.docs[0].data();
+        const pp = matchedPpDoc.data();
+        //console.log(pp);
 
         const record: any = {
           participantName: token['profile_name'] ?? '-',
@@ -315,10 +326,11 @@ export class AppComponent {
         this.allRecords.push(record);
       }
 
+      // ===== Final updates =====
       this.prepareDashboard();
       this.applyFilters();
-      this.reportLoaded = true;
       this.calculateDashboardCounts();
+      this.reportLoaded = true;
 
     } catch (e) {
       console.error(e);
@@ -326,6 +338,7 @@ export class AppComponent {
     } finally {
       this.loading = false;
     }
+
   }
 
   /* ================= KPI CLICK ================= */
