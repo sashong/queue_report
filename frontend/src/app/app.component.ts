@@ -3,7 +3,6 @@ import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { Router, RouterOutlet } from '@angular/router';
 import { AuthService } from './auth/auth.service';
-
 import { initializeApp, getApps } from 'firebase/app';
 import { getFirestore, collection, getDocs, query, where, doc } from 'firebase/firestore';
 import { environment } from '../environments/environments';
@@ -160,9 +159,8 @@ export class AppComponent {
 
 
   selectQueue(queue: any) {
-    console.log('Clicked queue:', queue.queuename, queue.id);
-
-  this.selectedQueueId = queue.id;
+  console.log('Clicked queue:', queue.queuename, queue.docid);
+  this.selectedQueueId = queue.docid;
   this.queueSearchText = queue.queuename;
   this.showQueueDropdown = false;
   this.onQueueChange();
@@ -246,9 +244,6 @@ trackByQueueId(index: number, queue: any) {
   return queue.id;
 }
 
-
-
-
   resetReport() {
     this.reportLoaded = false;
     this.allRecords = [];
@@ -288,7 +283,8 @@ trackByQueueId(index: number, queue: any) {
       const queueRef = doc(this.db, 'queue generation', this.selectedQueueId);
       const tokenSnap = await getDocs(
         query(
-          collection(this.db, 'queue_token'),where('queueref', '==', queueRef),where('tokenstatus', '==', 'Active'), where('stagestatus', '==', 'Approved')
+          collection(this.db, 'queue_token'),where('queueref', '==', queueRef)
+          // ,where('tokenstatus', '==', 'Active'), where('stagestatus', '==', 'Approved')
         )
       );
       const ppSnap = await getDocs(
