@@ -1,3 +1,5 @@
+
+
 <div class="container" *ngIf="showDashboard">
 
   <button (click)="logout()" style="float:right">Logout</button>
@@ -103,22 +105,105 @@
     </div>
   </div>
 
+  <!-- ALL TOKENS TABLE -->
+<div class="table-wrapper" *ngIf="reportLoaded && allTokensRecords.length > 0">
+  <table>
+    <thead>
+      <tr>
+        <th>Participant</th>
+        <th>Product</th>
+        <th>Token Status</th>
+        <th>Stage Status</th>
+        <th>Current Stage</th>
+        <th>Mode</th>
+        <th>Product Status</th>
+      </tr>
+    </thead>
+
+    <tbody>
+      <tr *ngFor="let r of allTokensRecords">
+        <td>{{ r.participantName }}</td>
+        <td>{{ r.productName }}</td>
+        <td>{{ r.tokenStatus }}</td>
+        <td>{{ r.stageStatus }}</td>
+        <td>{{ r.currentStage }}</td>
+        <td>{{ r.mode }}</td>
+        <td>{{ r.productStatus }}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+
   <!-- TABLE -->
+  <h2 style="margin: 20px 0 10px 0;">
+    Validation Summary (Active & Approved Records)
+  </h2>
+
   <div class="table-wrapper">
+
     <table *ngIf="reportLoaded && paginatedRecords.length > 0">
       <thead>
         <tr>
           <th>Participant</th>
           <th>Product</th>
           <th>Product Status</th>
-          <th>Mode</th>
-          <th>Stage</th>
+          <th class="filter-header">
+            <span>Mode</span>
+
+            <div class="filter-wrapper">
+              <span class="filter-icon" (click)="toggleFilter('mode')">▼</span>
+
+              <div class="filter-dropdown" *ngIf="activeFilter === 'mode'">
+                <div class="filter-option" (click)="selectedIntegrationMode=''; applyFilters()">
+                  All
+                </div>
+
+                <div
+                  class="filter-option"
+                  *ngFor="let mode of integrationModeOptions"
+                  (click)="selectedIntegrationMode=mode; applyFilters()">
+                  {{ mode.value }} ({{ mode.count }})
+                </div>
+              </div>
+            </div>
+          </th>
+
+          <th class="filter-header">
+            <span>Stage</span>
+
+            <div class="filter-wrapper">
+              <span class="filter-icon" (click)="toggleFilter('stage')">▼</span>
+
+              <div class="filter-dropdown" *ngIf="activeFilter === 'stage'">
+                <div class="filter-option" (click)="selectedStage=''; applyFilters()">
+                  All
+                </div>
+
+                <div
+                  class="filter-option"
+                  *ngFor="let stage of stageOptions"
+                  (click)="selectedStage=stage; applyFilters()">
+                  {{ stage }}
+                </div>
+              </div>
+            </div>
+          </th>
+
+
+
           <th>Validation</th>
           <th>Reason</th>
         </tr>
       </thead>
 
       <tbody>
+        <tr *ngIf="!loading && filteredRecords.length === 0">
+          <td colspan="6" style="text-align: center; padding: 16px;">
+            No records match the selected filters
+          </td>
+        </tr>
+
         <tr *ngFor="let r of paginatedRecords">
           <td>{{ r.participantName }}</td>
           <td>{{ r.productName }}</td>
@@ -143,5 +228,4 @@
   </div>
 
 </div>
-
 <router-outlet *ngIf="!showDashboard"></router-outlet>

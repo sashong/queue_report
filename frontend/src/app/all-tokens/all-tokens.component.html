@@ -1,0 +1,54 @@
+<div class="container">
+<button (click)="logout()" style="float:right">Logout</button>
+
+  <h2>All Tokens</h2>
+    
+  <!-- Queue Selector -->
+  <div class="action-row">
+    <label>Select Queue:</label>
+    <select [(ngModel)]="selectedQueueId" (change)="onQueueChange()">
+      <option value="">-- Select Queue --</option>
+      <option *ngFor="let q of queues" [value]="q.id">
+        {{ q.queuename || q.id }}
+      </option>
+    </select>
+  </div>
+
+  <!-- Loading -->
+  <div *ngIf="loading" class="loading">Loading data...</div>
+
+  <!-- Error -->
+  <div *ngIf="error" class="error">{{ error }}</div>
+
+  <!-- Table -->
+  <table *ngIf="!loading && records.length > 0">
+    <thead>
+      <tr>
+        <th>Profile Name</th>
+        <th>Product</th>
+        <th>Token Status</th>
+        <th>Stage Status</th>
+        <th>Current Stage</th>
+        <th>Mode</th>
+        <th>Product Status</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr *ngFor="let r of records">
+        <td>{{ r.profileName }}</td>
+        <td>{{ r.productName }}</td>
+        <td>{{ r.tokenStatus }}</td>
+        <td>{{ r.stageStatus }}</td>
+        <td>{{ r.currentStage }}</td>
+        <td>{{ r.mode }}</td>
+        <td>{{ r.productStatus }}</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- No Data -->
+  <div *ngIf="!loading && records.length === 0 && selectedQueueId">
+    No tokens found for this queue.
+  </div>
+
+</div>

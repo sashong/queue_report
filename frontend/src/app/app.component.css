@@ -140,19 +140,22 @@ button {
 /* TABLE */
 .table-wrapper {
   border-radius: 10px;
-  overflow: hidden;
+  overflow: visible;
   box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
+
 
 table {
   width: 100%;
   border-collapse: collapse;
+  overflow: visible;
 }
 
 th,
 td {
   padding: 8px;
   border-bottom: 1px solid #e0e0e0;
+  overflow: visible;
 }
 
 thead {
@@ -172,7 +175,7 @@ thead {
 
 /* LOADING */
 .loading-overlay {
-  position: fixed;
+  position: relative;
   inset: 0;
   background: rgba(255,255,255,0.75);
   display: flex;
@@ -192,4 +195,41 @@ thead {
 
 @keyframes spin {
   to { transform: rotate(360deg); }
+}
+
+.filter-header {
+  position: relative;
+  white-space: nowrap;
+}
+
+.filter-wrapper {
+  display: inline-block;
+  position: relative;
+}
+
+.filter-icon {
+  cursor: pointer;
+  font-size: 12px;
+  margin-left: 6px;
+}
+
+.filter-dropdown {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  background: #fff;
+  border: 1px solid #ccc;
+  min-width: 120px;
+  z-index: 9999;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.12);
+}
+
+
+.filter-option {
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.filter-option:hover {
+  background: #f1f1f1;
 }

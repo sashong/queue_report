@@ -1,16 +1,27 @@
-import { LoginComponent } from './login/login.component';
-import { AuthGuard } from './auth/auth.guard';
 import { Routes } from '@angular/router';
+import { AuthGuard } from './auth/auth.guard';
 
-export const routes = [
+export const routes: Routes = [
   {
     path: 'login',
-    loadComponent: () => LoginComponent
+    loadComponent: () =>
+      import('./login/login.component').then(m => m.LoginComponent),
+  },
+  {
+    path: 'all-tokens',
+    canActivate: [AuthGuard],
+    loadComponent: () =>
+      import('./all-tokens/all-tokens.component').then(
+        m => m.AllTokensComponent
+      ),
   },
   {
     path: '',
-    canActivate: [AuthGuard],
-    loadComponent: () =>
-      import('./app.component').then(m => m.AppComponent),
-  }
+    pathMatch: 'full',
+    redirectTo: 'all-tokens',
+  },
+  {
+    path: '**',
+    redirectTo: 'all-tokens',
+  },
 ];

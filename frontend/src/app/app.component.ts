@@ -4,8 +4,9 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterOutlet } from '@angular/router';
 import { AuthService } from './auth/auth.service';
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, collection, getDocs, query, where, doc } from 'firebase/firestore';
+import { getFirestore, onSnapshot, collection, getDocs, query, where, doc } from 'firebase/firestore';
 import { environment } from '../environments/environments';
+
 
 @Component({
   selector: 'app-root',
@@ -26,6 +27,12 @@ export class AppComponent {
   showDashboard = false;
   loading = false;
   error = '';
+  showModeFilter = false;
+  showStageFilter = false;
+
+  modeSearchText = '';
+  stageSearchText = '';
+
 
   /* ================= QUEUE ================= */
 
@@ -44,11 +51,22 @@ export class AppComponent {
   filteredRecords: any[] = [];
   paginatedRecords: any[] = [];
   validationFailures: any[] = [];
+  tokenUnsub: any;
+  ppUnsub: any;
+  allTokensRecords: any[] = [];
+
+
+  liveTokens: any[] = [];
+  livePpDocs: any[] = [];
+
 
   /* ================= FILTERS ================= */
 
   selectedProductStatus = '';
   selectedIntegrationMode = '';
+  filteredIntegrationModeOptions: string[] = [];
+  filteredStageOptions: string[] = [];
+
   selectedStage = '';
   searchText = '';
 
@@ -274,85 +292,178 @@ trackByQueueId(index: number, queue: any) {
 
   /* ================= LOAD REPORT ================= */
 
-  async loadReport(queueId: string) {
-    //console.log('loadReport called with queueId:', queueId);
-    this.loading = true;
-    this.resetReport();
+    loadReport(queueId: string) {
+      this.loading = true;
+      this.resetReport();
 
-    try {
-      const queueRef = doc(this.db, 'queue generation', this.selectedQueueId);
-      const tokenSnap = await getDocs(
-        query(
-          collection(this.db, 'queue_token'),where('queueref', '==', queueRef)
-          // ,where('tokenstatus', '==', 'Active'), where('stagestatus', '==', 'Approved')
-        )
-      );
-      const ppSnap = await getDocs(
-        query(
-          collection(this.db, 'participantsproduct'), where('eventref', '==', queueRef)
-        )
-      );
+      // Stop previous listeners
+      if (this.tokenUnsub) this.tokenUnsub();
+      if (this.ppUnsub) this.ppUnsub();
 
-      for (const tokenDoc of tokenSnap.docs) {
-        const token = tokenDoc.data();
-        //console.log(token);
-        const matchedPpDoc = ppSnap.docs.find(ppDoc => {
-          const pp = ppDoc.data();
-          //console.log(pp);
-          return (
-            token['profile_id'] === pp['profileid'] &&
-            token['productref'] === pp['productref']
-          );
-        });
-        //console.log('Selected Queue ID:', this.selectedQueueId);
-        if (!matchedPpDoc) {
-          continue;
-        }
+      try {
+        const queueRef = doc(this.db, 'queue generation', queueId);
 
-        const pp = matchedPpDoc.data();
-        //console.log(pp);
-
-        const record: any = {
-          participantName: token['profile_name'] ?? '-',
-          productName: token['productname'] ?? '-',
-          productStatus: pp['status'] ?? '-',
-          integrationMode: pp['mode'] ?? '-',
-          tokenStage: token['currentstage'] ?? '-'
-        };
-
-        const validation = this.validateRecord(
-          record.productStatus,
-          record.tokenStage,
-          record.integrationMode
+        //  LIVE TOKEN LISTENER
+        this.tokenUnsub = onSnapshot(
+          query(
+            collection(this.db, 'queue_token'),
+            where('queueref', '==', queueRef),
+            where('tokenstatus', '==', 'Active'), where('stagestatus', '==', 'Approved')
+          ),
+          (tokenSnap) => {
+            this.liveTokens = tokenSnap.docs.map(d => d.data());
+            this.buildLiveReport();
+          }
         );
 
-        record.validationPassed = validation.passed;
-        record.validationReason = validation.reason;
+        //  LIVE PARTICIPANT PRODUCT LISTENER
+        this.ppUnsub = onSnapshot(
+          query(
+            collection(this.db, 'participantsproduct'),
+            where('eventref', '==', queueRef)
+          ),
+          (ppSnap) => {
+            this.livePpDocs = ppSnap.docs.map(d => ({
+              id: d.id,
+              ...d.data()
+            }));
+            this.buildLiveReport();
+          }
+        );
 
-        if (!validation.passed) {
-          this.validationFailures.push(record);
-        }
-
-        this.allRecords.push(record);
+      } catch (e) {
+        console.error(e);
+        this.error = 'Failed to load report';
+        this.loading = false;
       }
-
-      // ===== Final updates =====
-      this.prepareDashboard();
-      this.applyFilters();
-      this.calculateDashboardCounts();
-      this.reportLoaded = true;
-
-    } catch (e) {
-      console.error(e);
-      this.error = 'Failed to load report';
-    } finally {
-      this.loading = false;
     }
-//console.log();
+
+    
+
+   buildLiveReport() {
+  this.allRecords = [];
+  this.validationFailures = [];
+  this.allTokensRecords = [];
+
+  for (const token of this.liveTokens) {
+
+    const ppId = token['participantproductid'];
+    const pp = ppId
+      ? this.livePpDocs.find(p => p.id === ppId)
+      : null;
+
+    const modeValue =
+      typeof pp?.mode === 'string' && pp.mode.trim() !== ''
+        ? pp.mode
+        : 'null';
+
+    // console.log("Mode:",pp?.mode)
+
+    // ================= ALL TOKENS TABLE =================
+    this.allTokensRecords.push({
+      participantName: token['profile_name'] ?? '-',
+      productName: token['productname'] ?? '-',
+      tokenStatus: token['tokenstatus'] ?? '-',
+      stageStatus: token['stagestatus'] ?? '-',
+      currentStage: token['currentstage'] ?? '-',
+      mode: modeValue,
+      productStatus: pp?.status ?? '-'
+    });
+
+    // ================= DASHBOARD TABLE (STRICT) =================
+    if (!pp) continue;
+
+    const record: any = {
+      participantName: token['profile_name'] ?? '-',
+      productName: token['productname'] ?? '-',
+      productStatus: pp.status ?? '-',
+      integrationMode: modeValue,
+      tokenStage: token['currentstage'] ?? '-'
+    };
+
+    const validation = this.validateRecord(
+      record.productStatus,
+      record.tokenStage,
+      record.integrationMode
+    );
+
+    record.validationPassed = validation.passed;
+    record.validationReason = validation.reason;
+
+    if (!validation.passed) {
+      this.validationFailures.push(record);
+    }
+
+    this.allRecords.push(record);
   }
 
-  
-  
+  // 🔒 SAFE option building
+  this.integrationModeOptions = Array.from(
+    new Map(
+      this.allRecords.map(r => [
+        r.integrationMode,
+        {
+          value: r.integrationMode,
+          count: this.allRecords.filter(
+            x => x.integrationMode === r.integrationMode
+          ).length
+        }
+      ])
+    ).values()
+  );
+
+  this.stageOptions = Array.from(
+    new Map(
+      this.allRecords.map(r => [
+        r.tokenStage,
+        {
+          value: r.tokenStage,
+          count: this.allRecords.filter(
+            x => x.tokenStage === r.tokenStage
+          ).length
+        }
+      ])
+    ).values()
+  );
+
+  // Build Mode options with count
+    this.integrationModeOptions = Array.from(
+      new Map(
+        this.allRecords.map(r => [
+          r.integrationMode,
+          {
+            value: r.integrationMode,
+            count: this.allRecords.filter(
+              x => x.integrationMode === r.integrationMode
+            ).length
+          }
+        ])
+      ).values()
+    );
+
+    // Build Stage options with count
+    this.stageOptions = Array.from(
+      new Map(
+        this.allRecords.map(r => [
+          r.tokenStage,
+          {
+            value: r.tokenStage,
+            count: this.allRecords.filter(
+              x => x.tokenStage === r.tokenStage
+            ).length
+          }
+        ])
+      ).values()
+    );
+
+
+  this.prepareDashboard();
+  this.applyFilters();
+  this.calculateDashboardCounts();
+  this.reportLoaded = true;
+  this.loading = false;
+}
+
 
   /* ================= KPI CLICK ================= */
 
@@ -367,6 +478,18 @@ trackByQueueId(index: number, queue: any) {
 
   applyFilters() {
   this.filteredRecords = this.allRecords.filter(r => {
+
+    // Mode filter
+    if (this.selectedIntegrationMode &&
+        r.integrationMode !== this.selectedIntegrationMode) {
+      return false;
+    }
+
+    // Stage filter
+    if (this.selectedStage &&
+        r.tokenStage !== this.selectedStage) {
+      return false;
+    }
 
     /* ================= KPI FILTERS ================= */
 
@@ -494,3 +617,4 @@ trackByQueueId(index: number, queue: any) {
     this.router.navigate(['/login']);
   }
 }
+

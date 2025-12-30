@@ -40,3 +40,8 @@ testem.log
 # System files
 .DS_Store
 Thumbs.db
+
+# Environment files (Angular)
+/frontend/src/environments/environments.ts
+/frontend/src/environments/environment.prod.ts
+/frontend/src/environments/environment.*.ts
