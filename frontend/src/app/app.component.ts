@@ -387,7 +387,7 @@ trackByQueueId(index: number, queue: any) {
     productName: token['participantproductid']
     ? (token['productname'] ?? '-')
     : 'No Participant Product ID found',
-    TokenID: token['docid'] ?? '-',
+    TokenID: token['tokennumber'] ?? '-',
     productStatus: pp?.status ?? '-',
     integrationMode: modeValue,
     stageStatus: token['stagestatus'] ?? '-',
@@ -416,7 +416,7 @@ trackByQueueId(index: number, queue: any) {
   // ---------------- ALL TOKENS TABLE (SEPARATE) ----------------
   this.allTokensRecords.push({
     participantName: record.participantName,
-    TokenID: token['docid'] ?? '-',
+    TokenID: token['tokennumber'] ?? '-',
     productName: record.productName,
     tokenStatus: record.tokenStatus,
     
@@ -691,5 +691,4 @@ trackByQueueId(index: number, queue: any) {
     this.authService.logout();
     this.router.navigate(['/login']);
   }
-}
-
+} 
