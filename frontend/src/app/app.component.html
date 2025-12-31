@@ -184,8 +184,8 @@
             </div>
           </div>
         </th>
-
         <th>Product Status</th>
+        <th>Event Participation Status</th>
         <th>Validation</th>
       </tr>
     </thead>
@@ -202,6 +202,7 @@
         <td>{{ r.productName }}</td>
         <td>{{ r.integrationMode }}</td>
         <td>{{ r.productStatus }}</td>
+        <td>{{ r.eventParticipationStatus }}</td>
         <td>
           <span class="ok" *ngIf="r.validationPassed">✔ Valid</span>
           <span class="fail" *ngIf="!r.validationPassed">✖ Invalid</span>

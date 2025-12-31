@@ -57,7 +57,8 @@ export class AppComponent {
   tokenUnsub: any;
   ppUnsub: any;
   allTokensRecords: any[] = [];
-
+  liveEventParticipationDocs: any[] = [];
+  epUnsub: any;
 
   liveTokens: any[] = [];
   livePpDocs: any[] = [];
@@ -130,12 +131,25 @@ export class AppComponent {
   validateRecord(
     productStatus: string,
     tokenStage: string,
-    integrationMode: string
+    integrationMode: string,
+    eventParticipationStatus: string
   ): { passed: boolean; reason: string } {
 
     const status = (productStatus || '').toLowerCase();
     const stage = (tokenStage || '').toLowerCase();
     const mode = (integrationMode || '').toLowerCase();
+
+    // HARD FAIL → INVALID if event participation status not found
+    if (
+      !eventParticipationStatus ||
+      eventParticipationStatus === 'Not Found'
+    ) {
+      return {
+        passed: false,
+        reason: 'Invalid: event participation status not found'
+      };
+    }
+
 
     // CASE 1 → VALID
     if (
@@ -355,6 +369,20 @@ trackByQueueId(index: number, queue: any) {
           }
         );
 
+        if (this.epUnsub) this.epUnsub();
+
+        this.epUnsub = onSnapshot(
+          collection(this.db, 'event participation request'),
+          (epSnap) => {
+            this.liveEventParticipationDocs = epSnap.docs.map(d => ({
+              id: d.id,        // firestore id (not used for matching)
+              ...d.data()      // contains docid, status, etc.
+            }));
+            this.buildLiveReport();
+          }
+        );
+
+
       } catch (e) {
         console.error(e);
         this.error = 'Failed to load report';
@@ -376,6 +404,18 @@ trackByQueueId(index: number, queue: any) {
     ? this.livePpDocs.find(p => p.id === ppId)
     : null;
 
+    const eventParticipationId = pp?.eventparticipationid;
+
+    const eventParticipation = eventParticipationId
+      ? this.liveEventParticipationDocs.find(
+          e => e.docid === eventParticipationId   // ✅ CORRECT MATCH
+        )
+      : null;
+
+    const eventParticipationStatus =
+      eventParticipation?.status ?? 'Not Found';
+
+
   const modeValue =
     typeof pp?.mode === 'string' && pp.mode.trim() !== ''
       ? pp.mode
@@ -393,6 +433,7 @@ trackByQueueId(index: number, queue: any) {
     stageStatus: token['stagestatus'] ?? '-',
     tokenStage: token['currentstage'] ?? '-',
     tokenStatus: token['tokenstatus'] ?? '-',
+    eventParticipationStatus,
     validationPassed: false,
     validationReason: ''
   };
@@ -401,7 +442,8 @@ trackByQueueId(index: number, queue: any) {
   const validation = this.validateRecord(
     record.productStatus,
     record.tokenStage,
-    record.integrationMode
+    record.integrationMode,
+    record.eventParticipationStatus
   );
 
   record.validationPassed = validation.passed;
@@ -419,7 +461,7 @@ trackByQueueId(index: number, queue: any) {
     TokenID: token['tokennumber'] ?? '-',
     productName: record.productName,
     tokenStatus: record.tokenStatus,
-    
+    eventParticipationStatus: record.eventParticipationStatus,
     currentStage: record.tokenStage,
     mode: record.integrationMode,
     productStatus: record.productStatus,
