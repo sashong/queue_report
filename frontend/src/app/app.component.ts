@@ -29,6 +29,9 @@ export class AppComponent {
   error = '';
   showModeFilter = false;
   showStageFilter = false;
+  selectedProduct = '';
+  productOptions: any[] = [];
+
 
   modeSearchText = '';
   stageSearchText = '';
@@ -83,6 +86,9 @@ export class AppComponent {
     | 'cancelled'
     | 'valid'
     | 'invalid'
+    | 'active'
+    | 'inactive'
+    | 'shifted'
     | null = null;
 
   /* ================= PAGINATION ================= */
@@ -100,7 +106,10 @@ export class AppComponent {
     ongoing: 0,
     cancelled: 0,
     valid: 0,
-    failed: 0
+    failed: 0,
+    active: 0,
+    inactive: 0,
+    shifted:0
   };
 
   constructor(
@@ -233,6 +242,18 @@ export class AppComponent {
     r => r.productStatus?.toLowerCase() === 'cancelled'
   ).length;
 
+  this.dashboard.active = this.allRecords.filter(
+    r => String(r.tokenStatus).trim().toLowerCase() === 'active'
+  ).length;
+
+  this.dashboard.inactive = this.allRecords.filter(
+    r => String(r.tokenStatus).trim().toLowerCase() === 'inactive'
+  ).length;
+
+  this.dashboard.shifted = this.allRecords.filter(
+    r => String(r.tokenStatus).trim().toLowerCase() === 'shifted'
+  ).length;
+
   this.dashboard.valid = this.allRecords.filter(
     r => r.validationPassed === true
   ).length;
@@ -277,7 +298,10 @@ trackByQueueId(index: number, queue: any) {
       ongoing: 0,
       cancelled: 0,
       valid: 0,
-      failed: 0
+      failed: 0,
+      active: 0,
+      inactive:0,
+      shifted:0
     };
   }
 
@@ -347,55 +371,61 @@ trackByQueueId(index: number, queue: any) {
 
   for (const token of this.liveTokens) {
 
-    const ppId = token['participantproductid'];
-    const pp = ppId
-      ? this.livePpDocs.find(p => p.id === ppId)
-      : null;
+  const ppId = token['participantproductid'];
+  const pp = ppId
+    ? this.livePpDocs.find(p => p.id === ppId)
+    : null;
 
-    const modeValue =
-      typeof pp?.mode === 'string' && pp.mode.trim() !== ''
-        ? pp.mode
-        : 'null';
+  const modeValue =
+    typeof pp?.mode === 'string' && pp.mode.trim() !== ''
+      ? pp.mode
+      : 'null';
 
-    // console.log("Mode:",pp?.mode)
+  // ---------------- CREATE RECORD (MISSING PIECE) ----------------
+  const record = {
+    participantName: token['profile_name'] ?? '-',
+    productName: token['participantproductid']
+    ? (token['productname'] ?? '-')
+    : 'No Participant Product ID found',
+    TokenID: token['docid'] ?? '-',
+    productStatus: pp?.status ?? '-',
+    integrationMode: modeValue,
+    stageStatus: token['stagestatus'] ?? '-',
+    tokenStage: token['currentstage'] ?? '-',
+    tokenStatus: token['tokenstatus'] ?? '-',
+    validationPassed: false,
+    validationReason: ''
+  };
 
-    // ================= ALL TOKENS TABLE =================
-    this.allTokensRecords.push({
-      participantName: token['profile_name'] ?? '-',
-      productName: token['productname'] ?? '-',
-      tokenStatus: token['tokenstatus'] ?? '-',
-      stageStatus: token['stagestatus'] ?? '-',
-      currentStage: token['currentstage'] ?? '-',
-      mode: modeValue,
-      productStatus: pp?.status ?? '-'
-    });
+  // ---------------- RUN VALIDATION ----------------
+  const validation = this.validateRecord(
+    record.productStatus,
+    record.tokenStage,
+    record.integrationMode
+  );
 
-    // ================= DASHBOARD TABLE (STRICT) =================
-    if (!pp) continue;
+  record.validationPassed = validation.passed;
+  record.validationReason = validation.reason;
 
-    const record: any = {
-      participantName: token['profile_name'] ?? '-',
-      productName: token['productname'] ?? '-',
-      productStatus: pp.status ?? '-',
-      integrationMode: modeValue,
-      tokenStage: token['currentstage'] ?? '-'
-    };
-
-    const validation = this.validateRecord(
-      record.productStatus,
-      record.tokenStage,
-      record.integrationMode
-    );
-
-    record.validationPassed = validation.passed;
-    record.validationReason = validation.reason;
-
-    if (!validation.passed) {
-      this.validationFailures.push(record);
-    }
-
-    this.allRecords.push(record);
+  if (!validation.passed) {
+    this.validationFailures.push(record);
   }
+
+  this.allRecords.push(record);
+
+  // ---------------- ALL TOKENS TABLE (SEPARATE) ----------------
+  this.allTokensRecords.push({
+    participantName: record.participantName,
+    TokenID: token['docid'] ?? '-',
+    productName: record.productName,
+    tokenStatus: record.tokenStatus,
+    
+    currentStage: record.tokenStage,
+    mode: record.integrationMode,
+    productStatus: record.productStatus,
+  });
+}
+
 
   // 🔒 SAFE option building
   this.integrationModeOptions = Array.from(
@@ -411,6 +441,21 @@ trackByQueueId(index: number, queue: any) {
       ])
     ).values()
   );
+
+  this.productOptions = Array.from(
+  new Map(
+    this.allRecords.map(r => [
+      r.productName,
+      {
+        value: r.productName,
+        count: this.allRecords.filter(
+          x => x.productName === r.productName
+        ).length
+      }
+    ])
+  ).values()
+);
+
 
   this.stageOptions = Array.from(
     new Map(
@@ -468,7 +513,7 @@ trackByQueueId(index: number, queue: any) {
   /* ================= KPI CLICK ================= */
 
   onKpiClick(
-    type: 'completed' | 'initiated' | 'ongoing' | 'cancelled' | 'valid' | 'invalid'
+    type: 'completed' | 'initiated' | 'active' | 'inactive' | 'shifted' | 'ongoing' | 'cancelled' | 'valid' | 'invalid' 
   ) {
     this.activeKpiFilter = this.activeKpiFilter === type ? null : type;
     this.applyFilters();
@@ -484,6 +529,15 @@ trackByQueueId(index: number, queue: any) {
         r.integrationMode !== this.selectedIntegrationMode) {
       return false;
     }
+
+    // Product filter
+    if (
+      this.selectedProduct &&
+      r.productName !== this.selectedProduct
+    ) {
+      return false;
+    }
+
 
     // Stage filter
     if (this.selectedStage &&
@@ -517,6 +571,27 @@ trackByQueueId(index: number, queue: any) {
     if (
       this.activeKpiFilter === 'cancelled' &&
       r.productStatus?.toLowerCase() !== 'cancelled'
+    ) {
+      return false;
+    }
+
+    if (
+      this.activeKpiFilter === 'active' &&
+      String(r.tokenStatus).trim().toLowerCase() !== 'active'
+    ) {
+      return false;
+    } 
+
+    if (
+      this.activeKpiFilter === 'inactive' &&
+      String(r.tokenStatus).trim().toLowerCase() !== 'inactive'
+    ) {
+      return false;
+    }
+
+    if (
+      this.activeKpiFilter === 'shifted' &&
+      String(r.tokenStatus).trim().toLowerCase() !== 'shifted'
     ) {
       return false;
     }

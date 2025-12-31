@@ -16,21 +16,29 @@
          (click)="activeKpiFilter=null; applyFilters()"
          [class.active]="activeKpiFilter===null">
       <div class="kpi-value">{{ dashboard.total }}</div>
-      <div class="kpi-label">Total Records</div>
+      <div class="kpi-label">Total Tokens</div>
     </div>
+
+    <div class="kpi"
+        (click)="onKpiClick('active')"
+        [class.active]="activeKpiFilter==='active'">
+      <div class="kpi-value">{{ dashboard.active }}</div>
+      <div class="kpi-label">Active Tokens</div>
+    </div>
+
+    <div class="kpi"
+        (click)="onKpiClick('inactive')"
+        [class.active]="activeKpiFilter==='inactive'">
+      <div class="kpi-value">{{ dashboard.inactive }}</div>
+      <div class="kpi-label">Inactive Tokens</div>
+    </div>
+
 
     <div class="kpi"
          (click)="onKpiClick('completed')"
          [class.active]="activeKpiFilter==='completed'">
       <div class="kpi-value">{{ dashboard.completed }}</div>
       <div class="kpi-label">Completed</div>
-    </div>
-
-    <div class="kpi"
-         (click)="onKpiClick('initiated')"
-         [class.active]="activeKpiFilter==='initiated'">
-      <div class="kpi-value">{{ dashboard.initiated }}</div>
-      <div class="kpi-label">Initiated</div>
     </div>
 
     <div class="kpi"
@@ -45,6 +53,13 @@
          [class.active]="activeKpiFilter==='cancelled'">
       <div class="kpi-value">{{ dashboard.cancelled }}</div>
       <div class="kpi-label">Cancelled</div>
+    </div>
+
+    <div class="kpi"
+         (click)="onKpiClick('shifted')"
+         [class.active]="activeKpiFilter==='shifted'">
+      <div class="kpi-value">{{ dashboard.shifted }}</div>
+      <div class="kpi-label">Shifted</div>
     </div>
 
     <div class="kpi"
@@ -106,122 +121,98 @@
   </div>
 
   <!-- ALL TOKENS TABLE -->
-<div class="table-wrapper" *ngIf="reportLoaded && allTokensRecords.length > 0">
+<div class="table-wrapper" *ngIf="reportLoaded && paginatedRecords.length > 0">
   <table>
     <thead>
       <tr>
-        <th>Participant</th>
-        <th>Product</th>
+        <th>Participant Name</th>
+        <th>Token Number</th>
+        
+        
         <th>Token Status</th>
         <th>Stage Status</th>
-        <th>Current Stage</th>
-        <th>Mode</th>
+        <!-- STAGE FILTER -->
+        <th class="filter-header">
+          <span>Current Stage</span>
+          <div class="filter-wrapper">
+            <span class="filter-icon" (click)="toggleFilter('stage')">▼</span>
+            <div class="filter-dropdown" *ngIf="activeFilter === 'stage'">
+              <div class="filter-option" (click)="selectedStage=''; applyFilters()">All</div>
+              <div
+                class="filter-option"
+                *ngFor="let stage of stageOptions"
+                (click)="selectedStage=stage.value; applyFilters()">
+                {{ stage.value }} ({{ stage.count }})
+              </div>
+            </div>
+          </div>
+        </th>
+        <th class="filter-header">
+          <span>Product Name </span>
+          <div class="filter-wrapper">
+            <span class="filter-icon" (click)="toggleFilter('status')">▼</span>
+
+            <div class="filter-dropdown" *ngIf="activeFilter === 'status'">
+              <div class="filter-option" (click)="selectedProduct=''; applyFilters()">
+                All
+              </div>
+
+              <div
+                class="filter-option"
+                *ngFor="let product of productOptions"
+                (click)="selectedProduct=product.value; applyFilters()">
+                {{ product.value }} ({{ product.count }})
+              </div>
+            </div>
+          </div>
+        </th>
+
+
+        <!-- MODE FILTER -->
+        <th class="filter-header">
+          <span>Mode</span>
+          <div class="filter-wrapper">
+            <span class="filter-icon" (click)="toggleFilter('mode')">▼</span>
+            <div class="filter-dropdown" *ngIf="activeFilter === 'mode'">
+              <div class="filter-option" (click)="selectedIntegrationMode=''; applyFilters()">All</div>
+              <div
+                class="filter-option"
+                *ngFor="let mode of integrationModeOptions"
+                (click)="selectedIntegrationMode=mode.value; applyFilters()">
+                {{ mode.value }} ({{ mode.count }})
+              </div>
+            </div>
+          </div>
+        </th>
+
         <th>Product Status</th>
+        <th>Validation</th>
       </tr>
     </thead>
 
     <tbody>
-      <tr *ngFor="let r of allTokensRecords">
+      <tr *ngFor="let r of paginatedRecords">
+        
         <td>{{ r.participantName }}</td>
-        <td>{{ r.productName }}</td>
+        <td>{{ r.TokenID }}</td>
+        
         <td>{{ r.tokenStatus }}</td>
         <td>{{ r.stageStatus }}</td>
-        <td>{{ r.currentStage }}</td>
-        <td>{{ r.mode }}</td>
+        <td>{{ r.tokenStage }}</td>
+        <td>{{ r.productName }}</td>
+        <td>{{ r.integrationMode }}</td>
         <td>{{ r.productStatus }}</td>
+        <td>
+          <span class="ok" *ngIf="r.validationPassed">✔ Valid</span>
+          <span class="fail" *ngIf="!r.validationPassed">✖ Invalid</span>
+        </td>
       </tr>
     </tbody>
   </table>
 </div>
 
 
-  <!-- TABLE -->
-  <h2 style="margin: 20px 0 10px 0;">
-    Validation Summary (Active & Approved Records)
-  </h2>
-
-  <div class="table-wrapper">
-
-    <table *ngIf="reportLoaded && paginatedRecords.length > 0">
-      <thead>
-        <tr>
-          <th>Participant</th>
-          <th>Product</th>
-          <th>Product Status</th>
-          <th class="filter-header">
-            <span>Mode</span>
-
-            <div class="filter-wrapper">
-              <span class="filter-icon" (click)="toggleFilter('mode')">▼</span>
-
-              <div class="filter-dropdown" *ngIf="activeFilter === 'mode'">
-                <div class="filter-option" (click)="selectedIntegrationMode=''; applyFilters()">
-                  All
-                </div>
-
-                <div
-                  class="filter-option"
-                  *ngFor="let mode of integrationModeOptions"
-                  (click)="selectedIntegrationMode=mode; applyFilters()">
-                  {{ mode.value }} ({{ mode.count }})
-                </div>
-              </div>
-            </div>
-          </th>
-
-          <th class="filter-header">
-            <span>Stage</span>
-
-            <div class="filter-wrapper">
-              <span class="filter-icon" (click)="toggleFilter('stage')">▼</span>
-
-              <div class="filter-dropdown" *ngIf="activeFilter === 'stage'">
-                <div class="filter-option" (click)="selectedStage=''; applyFilters()">
-                  All
-                </div>
-
-                <div
-                  class="filter-option"
-                  *ngFor="let stage of stageOptions"
-                  (click)="selectedStage=stage; applyFilters()">
-                  {{ stage }}
-                </div>
-              </div>
-            </div>
-          </th>
-
-
-
-          <th>Validation</th>
-          <th>Reason</th>
-        </tr>
-      </thead>
-
-      <tbody>
-        <tr *ngIf="!loading && filteredRecords.length === 0">
-          <td colspan="6" style="text-align: center; padding: 16px;">
-            No records match the selected filters
-          </td>
-        </tr>
-
-        <tr *ngFor="let r of paginatedRecords">
-          <td>{{ r.participantName }}</td>
-          <td>{{ r.productName }}</td>
-          <td>{{ r.productStatus }}</td>
-          <td>{{ r.integrationMode }}</td>
-          <td>{{ r.tokenStage }}</td>
-          <td>
-            <span class="ok" *ngIf="r.validationPassed">✔ Valid</span>
-            <span class="fail" *ngIf="!r.validationPassed">✖ Invalid</span>
-          </td>
-          <td>{{ r.validationReason }}</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
-
-  <!-- PAGINATION -->
-  <div class="pagination" *ngIf="reportLoaded && totalPages > 1">
+<div class="pagination" *ngIf="reportLoaded && totalPages > 1">
     <button (click)="prevPage()">Prev</button>
     Page {{ currentPage }} / {{ totalPages }}
     <button (click)="nextPage()">Next</button>

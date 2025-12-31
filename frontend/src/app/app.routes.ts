@@ -7,14 +7,14 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./login/login.component').then(m => m.LoginComponent),
   },
-  {
-    path: 'all-tokens',
-    canActivate: [AuthGuard],
-    loadComponent: () =>
-      import('./all-tokens/all-tokens.component').then(
-        m => m.AllTokensComponent
-      ),
-  },
+  // {
+  //   path: 'all-tokens',
+  //   canActivate: [AuthGuard],
+  //   loadComponent: () =>
+  //     import('./all-tokens/all-tokens.component').then(
+  //       m => m.AllTokensComponent
+  //     ),
+  // },
   {
     path: '',
     pathMatch: 'full',
