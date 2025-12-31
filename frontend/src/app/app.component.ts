@@ -155,7 +155,7 @@ export class AppComponent {
     if (
       status === 'completed' &&
       stage === 'completed' &&
-      mode === 'integration mode'
+      mode === 'integration mode' || 'extended mode' || 'performance mode' || 'after performance mode'
     ) {
       return {
         passed: true,
