@@ -70,10 +70,31 @@
     </div>
 
     <div class="kpi"
-         (click)="onKpiClick('invalid')"
-         [class.active]="activeKpiFilter==='invalid'">
-      <div class="kpi-value">{{ dashboard.failed }}</div>
-      <div class="kpi-label">Invalid</div>
+        (click)="onKpiClick('invalid_reason')"
+        [class.active]="activeKpiFilter==='invalid_reason'">
+      <div class="kpi-value">{{ invalidByReasonCount }}</div>
+      <div class="kpi-label">Invalid by Flow</div>
+    </div>
+
+    <div class="kpi"
+        (click)="onKpiClick('invalid_product')"
+        [class.active]="activeKpiFilter==='invalid_product'">
+      <div class="kpi-value">{{ invalidByProductCount }}</div>
+      <div class="kpi-label">Participantsproduct Missing</div>
+    </div>
+
+    <div class="kpi"
+        (click)="onKpiClick('invalid_event_status')"
+        [class.active]="activeKpiFilter==='invalid_event_status'">
+      <div class="kpi-value">{{ invalidByEventStatusCount }}</div>
+      <div class="kpi-label">Event Participation Status Missing
+        <button
+          class="btn-fix-all"
+          *ngIf="activeKpiFilter === 'invalid_event_status'"
+          (click)="fixAllInvalidEventStatus()">
+          Fix All
+        </button>
+      </div>
     </div>
   </div>
 
@@ -204,8 +225,14 @@
         <td>{{ r.productStatus }}</td>
         <td>{{ r.eventParticipationStatus }}</td>
         <td>
+          <!-- VALID -->
           <span class="ok" *ngIf="r.validationPassed">✔ Valid</span>
-          <span class="fail" *ngIf="!r.validationPassed">✖ Invalid</span>
+
+          <!-- INVALID -->
+          <ng-container *ngIf="!r.validationPassed">
+            <span class="fail">✖ Invalid</span>
+            <br />
+          </ng-container>
         </td>
       </tr>
     </tbody>

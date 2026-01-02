@@ -4,7 +4,20 @@ import { FormsModule } from '@angular/forms';
 import { Router, RouterOutlet } from '@angular/router';
 import { AuthService } from './auth/auth.service';
 import { initializeApp, getApps } from 'firebase/app';
-import { getFirestore, onSnapshot, collection, getDocs, query, where, doc } from 'firebase/firestore';
+import {
+  getFirestore,
+  onSnapshot,
+  collection,
+  getDocs,
+  query,
+  where,
+  doc,
+  addDoc,
+  updateDoc,
+  serverTimestamp,
+  setDoc
+} from 'firebase/firestore';
+
 import { environment } from '../environments/environments';
 
 
@@ -31,8 +44,9 @@ export class AppComponent {
   showStageFilter = false;
   selectedProduct = '';
   productOptions: any[] = [];
-
-
+  invalidByReasonCount = 0;
+  invalidByProductCount = 0;
+  invalidByEventStatusCount = 0;
   modeSearchText = '';
   stageSearchText = '';
 
@@ -70,7 +84,6 @@ export class AppComponent {
   selectedIntegrationMode = '';
   filteredIntegrationModeOptions: string[] = [];
   filteredStageOptions: string[] = [];
-
   selectedStage = '';
   searchText = '';
 
@@ -90,6 +103,10 @@ export class AppComponent {
     | 'active'
     | 'inactive'
     | 'shifted'
+    | 'invalid_reason'
+    | 'invalid_product'
+    | 'invalid_event_status'
+
     | null = null;
 
   /* ================= PAGINATION ================= */
@@ -155,7 +172,7 @@ export class AppComponent {
     if (
       status === 'completed' &&
       stage === 'completed' &&
-      mode === 'integration mode' || 'extended mode' || 'performance mode' || 'after performance mode'
+      ['integration mode', 'extended mode', 'performance mode', 'after performance mode'].includes(mode)
     ) {
       return {
         passed: true,
@@ -319,6 +336,209 @@ trackByQueueId(index: number, queue: any) {
     };
   }
 
+  async handleEventParticipationForSelectedToken(selectedToken: any) {
+    try {
+      if (selectedToken.validationPassed === true) {
+        return;
+      }
+
+      const ppid = selectedToken.participantproductid;
+      if (!ppid) {
+        console.warn('PPID missing, cannot proceed');
+        return;
+      }
+
+      const selectedQueueRef = doc(
+        this.db,
+        'queue generation',
+        this.selectedQueueId
+      );
+
+      const productRef = selectedToken.productref;
+
+      if (!productRef) {
+        console.warn('eventref or productref missing in token');
+        return;
+      }
+
+      //Resolve arenaeventid using eventref + productref
+
+      const arenaQuery = query(
+        collection(this.db, 'arena events'),
+        where('productref', '==', productRef),
+        where('eventref', '==', selectedQueueRef),
+        where("delete", "==", false)
+      );
+
+
+      const arenaSnap = await getDocs(arenaQuery);
+
+      if (arenaSnap.empty) {
+        console.warn('No arena event found for given eventref and productref');
+        return;
+      }
+
+      // Assuming one arena per event + product
+      const arenaDoc = arenaSnap.docs[0];
+      const arenaeventid = arenaDoc.data()['docid'];
+
+      /* ---------------------------------------
+        Check existing event participation request
+      ---------------------------------------- */
+
+      const epQuery = query(
+        collection(this.db, 'event participation request'),
+        where('participantproductid', '==', ppid),
+        where('arenaeventid', '==', arenaeventid)
+      );
+
+      const epSnap = await getDocs(epQuery);
+
+      if (!epSnap.empty) {
+        // Update timestamp
+        await updateDoc(epSnap.docs[0].ref, {
+          updateddate: serverTimestamp()
+        });
+        return;
+      }
+
+      //Decide status
+
+      const productStatus = String(selectedToken.productStatus).toLowerCase();
+      const participationStatus =
+        ['ongoing', 'completed', 'shifted'].includes(productStatus)
+          ? 'approved'
+          : 'denied';
+
+      //Create event participation request
+      // Generate docID 
+      const epRef = doc(
+        collection(this.db, 'event participation request')
+      );
+
+      // SINGLE atomic write
+      await setDoc(epRef, {
+        docid: epRef.id,                     
+        doccreateddate: serverTimestamp(),
+        eventref: selectedQueueRef,
+        productref: productRef,
+        status: participationStatus,
+        profileid: selectedToken.profileid,
+        participantproductid: ppid,
+        arenaeventid: arenaeventid,
+        initiatedfrom: 'health'
+      });
+
+
+      // eventparticipationid into participantsproduct 
+      const ppQuery = query(
+        collection(this.db, 'participantsproduct'),
+        where('docid', '==', ppid)
+      );
+
+      const ppSnap = await getDocs(ppQuery);
+
+      if (!ppSnap.empty) {
+        await updateDoc(ppSnap.docs[0].ref, {
+          eventparticipationid: epRef.id,
+          eventref: selectedQueueRef,  
+          arenaeventid: arenaeventid
+        });
+      } else {
+        console.warn('Participantsproduct document not found for ppid:', ppid);
+      }
+
+
+
+      // OPTIMISTIC UPDATE (this is the key)
+      this.liveEventParticipationDocs.push({
+        id: epRef.id,
+        docid: epRef.id,
+        status: participationStatus,
+        participantproductid: ppid,
+        arenaeventid: arenaeventid
+      });
+
+    } catch (error) {
+      console.error('Failed to handle event participation request', error);
+    }
+  }
+
+  async fixInvalidToken(record: any) {
+    record.fixing = true;
+    try {
+      await this.handleEventParticipationForSelectedToken(record);
+      this.buildLiveReport();
+    } finally {
+      record.fixing = false;
+    }
+  }
+
+  async fixAllInvalidEventStatus() {
+    // Only fix records with missing event participation
+    const recordsToFix = this.filteredRecords.filter(
+      r =>
+        !r.validationPassed &&
+        r.eventParticipationStatus === 'Not Found' &&
+        !r.fixing
+    );
+
+    if (recordsToFix.length === 0) {
+      return;
+    }
+
+    for (const record of recordsToFix) {
+      record.fixing = true;
+
+      try {
+        await this.handleEventParticipationForSelectedToken(record);
+      } catch (e) {
+        console.error('Fix failed for token', record.TokenID, e);
+      } finally {
+        record.fixing = false;
+      }
+    }
+
+    // Rebuild once after all fixes
+    this.buildLiveReport();
+  }
+
+
+  calculateInvalidKpiCounts() {
+  const reasons = new Set<string>();
+  const products = new Set<string>();
+  const eventStatuses = new Set<string>();
+
+  for (const r of this.validationFailures) {
+    if (r.validationReason) {
+      reasons.add(r.validationReason);
+    }
+
+    if (r.productName) {
+      products.add(r.productName);
+    }
+
+    if (r.eventParticipationStatus) {
+      eventStatuses.add(r.eventParticipationStatus);
+    }
+  }
+
+  this.invalidByReasonCount = this.validationFailures.filter(
+    r => r.invalidGroup === 'FLOW_MISSING'
+  ).length;
+
+  this.invalidByProductCount = this.validationFailures.filter(
+    r => r.invalidGroup === 'NO_PPID'
+  ).length;
+
+  this.invalidByEventStatusCount = this.validationFailures.filter(
+    r => r.invalidGroup === 'NO_EVENT_PARTICIPATION'
+  ).length;
+
+}
+
+
+
   /* ================= LOAD QUEUES ================= */
 
   async loadQueues() { const snap = await getDocs(collection(this.db, 'queue generation')); 
@@ -375,8 +595,8 @@ trackByQueueId(index: number, queue: any) {
           collection(this.db, 'event participation request'),
           (epSnap) => {
             this.liveEventParticipationDocs = epSnap.docs.map(d => ({
-              id: d.id,        // firestore id (not used for matching)
-              ...d.data()      // contains docid, status, etc.
+              id: d.id,       
+              ...d.data()      
             }));
             this.buildLiveReport();
           }
@@ -408,7 +628,7 @@ trackByQueueId(index: number, queue: any) {
 
     const eventParticipation = eventParticipationId
       ? this.liveEventParticipationDocs.find(
-          e => e.docid === eventParticipationId   // ✅ CORRECT MATCH
+          e => e.docid === eventParticipationId   
         )
       : null;
 
@@ -424,6 +644,10 @@ trackByQueueId(index: number, queue: any) {
   // ---------------- CREATE RECORD (MISSING PIECE) ----------------
   const record = {
     participantName: token['profile_name'] ?? '-',
+    participantproductid: token['participantproductid'], 
+    eventref: token['eventref'],                           
+    productref: token['productref'],                       
+    profileid: token['profile_id'],                        
     productName: token['participantproductid']
     ? (token['productname'] ?? '-')
     : 'No Participant Product ID found',
@@ -435,7 +659,8 @@ trackByQueueId(index: number, queue: any) {
     tokenStatus: token['tokenstatus'] ?? '-',
     eventParticipationStatus,
     validationPassed: false,
-    validationReason: ''
+    validationReason: '',
+    invalidGroup: null as 'FLOW_MISSING' | 'NO_PPID' | 'NO_EVENT_PARTICIPATION' | null
   };
 
   // ---------------- RUN VALIDATION ----------------
@@ -447,7 +672,33 @@ trackByQueueId(index: number, queue: any) {
   );
 
   record.validationPassed = validation.passed;
-  record.validationReason = validation.reason;
+
+  let invalidGroup:
+  | 'FLOW_MISSING'
+  | 'NO_PPID'
+  | 'NO_EVENT_PARTICIPATION'
+  | null = null;
+
+if (!validation.passed) {
+
+  // 2️⃣ No PPID found
+  if (!record.participantproductid) {
+    invalidGroup = 'NO_PPID';
+  }
+
+  // 3️⃣ No event participation status found
+  else if (record.eventParticipationStatus === 'Not Found') {
+    invalidGroup = 'NO_EVENT_PARTICIPATION';
+  }
+
+  // 1️⃣ Validation flow missing (fallback invalid)
+  else {
+    invalidGroup = 'FLOW_MISSING';
+  }
+}
+
+record.invalidGroup = invalidGroup;
+
 
   if (!validation.passed) {
     this.validationFailures.push(record);
@@ -469,7 +720,7 @@ trackByQueueId(index: number, queue: any) {
 }
 
 
-  // 🔒 SAFE option building
+  //  SAFE option building
   this.integrationModeOptions = Array.from(
     new Map(
       this.allRecords.map(r => [
@@ -543,19 +794,18 @@ trackByQueueId(index: number, queue: any) {
       ).values()
     );
 
-
   this.prepareDashboard();
   this.applyFilters();
   this.calculateDashboardCounts();
   this.reportLoaded = true;
   this.loading = false;
+  this.calculateInvalidKpiCounts();
 }
-
 
   /* ================= KPI CLICK ================= */
 
   onKpiClick(
-    type: 'completed' | 'initiated' | 'active' | 'inactive' | 'shifted' | 'ongoing' | 'cancelled' | 'valid' | 'invalid' 
+    type: 'completed' | 'initiated' | 'active' | 'inactive' | 'shifted' | 'ongoing' | 'cancelled' | 'valid' | 'invalid' | 'invalid_reason' | 'invalid_product' | 'invalid_event_status'
   ) {
     this.activeKpiFilter = this.activeKpiFilter === type ? null : type;
     this.applyFilters();
@@ -586,6 +836,25 @@ trackByQueueId(index: number, queue: any) {
         r.tokenStage !== this.selectedStage) {
       return false;
     }
+
+    if (this.activeKpiFilter === 'invalid' && r.validationPassed) {
+      return false;
+    }
+
+
+    // ---------- INVALID GROUP KPIs ----------
+    if (this.activeKpiFilter === 'invalid_reason') {
+      return r.invalidGroup === 'FLOW_MISSING';
+    }
+
+    if (this.activeKpiFilter === 'invalid_product') {
+      return r.invalidGroup === 'NO_PPID';
+    }
+
+    if (this.activeKpiFilter === 'invalid_event_status') {
+      return r.invalidGroup === 'NO_EVENT_PARTICIPATION';
+    }
+
 
     /* ================= KPI FILTERS ================= */
 
@@ -661,8 +930,25 @@ trackByQueueId(index: number, queue: any) {
     return true;
   });
 
+  // GROUPING SORT (must be BEFORE pagination)
+  if (
+    this.activeKpiFilter === 'invalid_reason' ||
+    this.activeKpiFilter === 'invalid_product' ||
+    this.activeKpiFilter === 'invalid_event_status'
+  ) {
+    this.filteredRecords.sort((a, b) =>
+      (a.validationReason || '').localeCompare(b.validationReason || '') ||
+      (a.productName || '').localeCompare(b.productName || '') ||
+      (a.eventParticipationStatus || '').localeCompare(b.eventParticipationStatus || '')
+    );
+  }
+
+  // Pagination AFTER sorting
   this.currentPage = 1;
   this.calculatePagination();
+
+
+
 }
 
 
